@@ -18,16 +18,16 @@ import {
   assessAddedElectricalLoad,
   PID_FORMULAS,
   convertUnit,
-  decodeVin,
   type ObdReader,
   type Assessment,
   type TimedSample,
   type UnitSystem,
-  type VinDecode,
   type DiagnosticSnapshot
 } from "./core.js";
 import { WebSerialTransport } from "./web-serial.js";
 import { toCsv, lineSeverityClass, dtcSearchUrl, dtcCodeInLine, boundedPush } from "./format.js";
+import { VinViewController, metricsCard } from "./vin-view.js";
+import { infoLine, errorLine, errMsg } from "./ui-helpers.js";
 import type { SerialPortInfo, HistoryRecord } from "../shared/ipc.js";
 
 // ---- tiny DOM helpers -------------------------------------------------------
@@ -48,10 +48,10 @@ let connectInFlight = false;
 let unitSystem: UnitSystem = "metric";
 let lastSnapshot: DiagnosticSnapshot | null = null;
 let lastLabel: string | undefined;
-let vehicleMake: string | undefined;
 let scanInProgress = false;
 let liveTimer: number | null = null;
 let liveSamples: TimedSample[] = [];
+let vin: VinViewController;
 type Zone = "ok" | "watch" | "warn";
 type LiveCard = { card: HTMLElement; numEl: HTMLElement; unitEl: HTMLElement; canvas: HTMLCanvasElement };
 type HeroGauge = { canvas: HTMLCanvasElement; value: number; unit?: string };
@@ -164,7 +164,7 @@ async function activate(client: ObdReader, label: string, demo: boolean): Promis
   try {
     const id = await client.initialize();
     conn = { client, label, demo };
-    vehicleMake = undefined; // Clear any previous vPIC lookup until new scan runs
+    vin.reset(); // Clear any previous vPIC lookup until new scan runs
     // Discover which live PIDs this car actually supports so the monitor adapts
     // to the vehicle instead of polling a fixed (often unsupported) set.
     monitorPids = await discoverMonitorPids(client);
@@ -259,7 +259,7 @@ async function disconnect(): Promise<void> {
     }
   }
   conn = null;
-  vehicleMake = undefined;
+  vin.reset();
   connectInFlight = false;
   show($("btn-live-export"), false);
   setStatus("Disconnected", "off");
@@ -275,7 +275,7 @@ function handleTransportLost(): void {
   if (!conn) return; // already disconnected
   stopLive();
   conn = null;
-  vehicleMake = undefined;
+  vin.reset();
   connectInFlight = false;
   show($("btn-live-export"), false);
   setStatus("Adapter disconnected — check the cable, then reconnect.", "off");
@@ -338,8 +338,7 @@ async function runScan(): Promise<void> {
     renderCurrentReport();
     // Auto-fill the VIN Checker with the car's VIN so it's ready to validate/decode.
     if (lastSnapshot.vin) {
-      $<HTMLInputElement>("vin-input").value = lastSnapshot.vin;
-      renderVinDecode(decodeVin(lastSnapshot.vin));
+      vin.setAndCheck(lastSnapshot.vin);
     }
     // Auto-save the scan so the History tab builds up over time (Electron only).
     void window.garage?.history.save({ savedAt: Date.now(), label: lastLabel, snapshot: lastSnapshot });
@@ -355,7 +354,7 @@ async function runScan(): Promise<void> {
 /** Re-render the most recent scan with the current display units. */
 function renderCurrentReport(): void {
   if (!lastSnapshot) return;
-  const report = buildReport(lastSnapshot, lastLabel, vehicleMake, unitSystem);
+  const report = buildReport(lastSnapshot, lastLabel, vin.make, unitSystem);
   renderReport($("diagnose-output"), report.headline, report.sections, report.caveats, report.text);
 }
 
@@ -930,141 +929,6 @@ function setupTune(): void {
   );
 }
 
-// ---- VIN checker ------------------------------------------------------------
-function setupVin(): void {
-  const input = $<HTMLInputElement>("vin-input");
-  $("btn-vin-check").addEventListener("click", () => checkVin());
-  input.addEventListener("keydown", e => {
-    if (e.key === "Enter") checkVin();
-  });
-  $("btn-vin-online").addEventListener("click", () => {
-    const decoded = decodeVin(input.value);
-    renderVinDecode(decoded);
-    // Don't spend a request on a VIN that fails the offline format check.
-    if (decoded.validation.format.ok) void vinOnlineLookup(decoded.vin, decoded.modelYear);
-  });
-}
-
-function checkVin(): void {
-  const vin = $<HTMLInputElement>("vin-input").value.trim();
-  $("vin-online").replaceChildren();
-  if (vin === "") {
-    $("vin-result").replaceChildren(infoLine("Enter a VIN to check."));
-    return;
-  }
-  renderVinDecode(decodeVin(vin));
-}
-
-/** Render the offline validation + structural decode of a VIN. */
-function renderVinDecode(d: VinDecode): void {
-  const out = $("vin-result");
-  out.replaceChildren();
-  const fmtOk = d.validation.format.ok;
-  const cd = d.validation.checkDigit;
-
-  const banner = document.createElement("div");
-  banner.className = "report-headline " + (!fmtOk ? "is-warn" : cd.matches ? "is-ok" : "");
-  const lamp = document.createElement("span");
-  lamp.className = "lamp " + (!fmtOk ? "lamp--warn" : cd.matches ? "lamp--ok" : "lamp--watch");
-  const txt = document.createElement("span");
-  txt.textContent = d.validation.assessment;
-  banner.append(lamp, txt);
-  out.appendChild(banner);
-
-  if (!fmtOk) return; // nothing structural to show on a malformed VIN
-
-  const rows: Array<[string, string | undefined]> = [
-    ["VIN", d.vin],
-    ["Country of origin", d.country],
-    ["Region", d.region],
-    ["Model year", d.modelYear ? String(d.modelYear) : undefined],
-    ["WMI (manufacturer)", d.wmi],
-    ["Plant code", d.plantCode],
-    ["Serial", d.serial],
-    ["Check digit", cd.evaluated ? `${cd.found} (expected ${cd.expected})` : undefined]
-  ];
-  out.appendChild(metricsCard(rows));
-}
-
-/** Look up the full make/model/engine online via NHTSA vPIC (the one network call). */
-async function vinOnlineLookup(vin: string, modelYear?: number): Promise<void> {
-  const out = $("vin-online");
-  out.replaceChildren(infoLine("Looking up the VIN with NHTSA vPIC…"));
-  try {
-    const yr = modelYear ? `&modelyear=${modelYear}` : "";
-    const url = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${encodeURIComponent(vin)}?format=json${yr}`;
-    // Wrap fetch in timeout (10 seconds) to avoid hanging on slow/offline networks
-    const fetchPromise = fetch(url);
-    const timeoutPromise = new Promise<Response>((_, reject) =>
-      setTimeout(() => reject(new Error("vPIC API timeout (>10s)")), 10000)
-    );
-    const res = await Promise.race([fetchPromise, timeoutPromise]);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = (await res.json()) as { Results?: Array<Record<string, string>> };
-    const row = json.Results?.[0];
-    if (!row) throw new Error("no result returned");
-    vehicleMake = row.Make;
-    renderVinOnline(out, row);
-  } catch (err) {
-    out.replaceChildren(errorLine(`Online lookup unavailable: ${errMsg(err)}. The offline decode above still applies.`));
-  }
-}
-
-function renderVinOnline(out: HTMLElement, row: Record<string, string>): void {
-  out.replaceChildren();
-  const head = document.createElement("div");
-  head.className = "report-headline is-ok";
-  const lamp = document.createElement("span");
-  lamp.className = "lamp lamp--ok";
-  const txt = document.createElement("span");
-  txt.textContent = "NHTSA vPIC decode";
-  head.append(lamp, txt);
-  out.appendChild(head);
-
-  const plant = [row.PlantCity, row.PlantState, row.PlantCountry].filter(v => v && v.trim()).join(", ");
-  const rows: Array<[string, string | undefined]> = [
-    ["Make", row.Make],
-    ["Model", row.Model],
-    ["Model year", row.ModelYear],
-    ["Trim", row.Trim],
-    ["Body class", row.BodyClass],
-    ["Vehicle type", row.VehicleType],
-    ["Cylinders", row.EngineCylinders],
-    ["Displacement (L)", row.DisplacementL],
-    ["Fuel", row.FuelTypePrimary],
-    ["Drive", row.DriveType],
-    ["Manufacturer", row.Manufacturer],
-    ["Plant", plant || undefined]
-  ];
-  out.appendChild(metricsCard(rows));
-
-  if (row.ErrorCode && row.ErrorCode !== "0" && row.ErrorText) {
-    out.appendChild(infoLine(`vPIC note: ${row.ErrorText}`));
-  }
-}
-
-/** Build a card of label/value metric rows, skipping blank values. */
-function metricsCard(rows: Array<[string, string | undefined]>): HTMLElement {
-  const card = document.createElement("div");
-  card.className = "card";
-  const grid = document.createElement("div");
-  grid.className = "metrics";
-  for (const [key, value] of rows) {
-    if (!value || value.trim() === "") continue;
-    const row = document.createElement("div");
-    row.className = "metric";
-    const k = document.createElement("span");
-    k.className = "metric-key";
-    k.textContent = key;
-    const v = document.createElement("span");
-    v.className = "metric-val";
-    v.textContent = value;
-    row.append(k, v);
-    grid.appendChild(row);
-  }
-  card.appendChild(grid);
-  return card;
-}
 
 // ---- tabs / misc ------------------------------------------------------------
 function setupTabs(): void {
@@ -1169,21 +1033,6 @@ async function setupAbout(): Promise<void> {
   }
 }
 
-function infoLine(text: string): HTMLElement {
-  const p = document.createElement("p");
-  p.className = "muted";
-  p.textContent = text;
-  return p;
-}
-function errorLine(text: string): HTMLElement {
-  const p = document.createElement("p");
-  p.className = "row row--warn";
-  p.textContent = text;
-  return p;
-}
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 /** A "look up ↗" link for a DTC code, opened in the OS browser. */
 function makeDtcLink(code: string): HTMLAnchorElement {
@@ -1214,12 +1063,14 @@ function milLampSvg(): SVGElement {
 
 // ---- boot -------------------------------------------------------------------
 function main(): void {
+  vin = new VinViewController("vin-result", "vin-online", "vin-input");
+  vin.setup("btn-vin-check", "btn-vin-online");
+
   setupTabs();
   setupPicker();
   setupUnits();
   setupHistory();
   setupTune();
-  setupVin();
   void setupAbout();
   $("btn-connect").addEventListener("click", () => void connectSerial());
   $("btn-demo").addEventListener("click", () => void connectDemo());
