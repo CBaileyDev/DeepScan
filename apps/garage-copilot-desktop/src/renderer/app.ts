@@ -27,6 +27,7 @@ import {
 import { WebSerialTransport } from "./web-serial.js";
 import { toCsv, lineSeverityClass, dtcSearchUrl, dtcCodeInLine, boundedPush } from "./format.js";
 import { VinViewController, metricsCard } from "./vin-view.js";
+import { HistoryViewController } from "./history-view.js";
 import { infoLine, errorLine, errMsg } from "./ui-helpers.js";
 import type { SerialPortInfo, HistoryRecord } from "../shared/ipc.js";
 
@@ -52,6 +53,7 @@ let scanInProgress = false;
 let liveTimer: number | null = null;
 let liveSamples: TimedSample[] = [];
 let vin: VinViewController;
+let history: HistoryViewController;
 type Zone = "ok" | "watch" | "warn";
 type LiveCard = { card: HTMLElement; numEl: HTMLElement; unitEl: HTMLElement; canvas: HTMLCanvasElement };
 type HeroGauge = { canvas: HTMLCanvasElement; value: number; unit?: string };
@@ -640,6 +642,7 @@ function setupUnits(): void {
   sel.addEventListener("change", () => {
     unitSystem = sel.value === "imperial" ? "imperial" : "metric";
     localStorage.setItem("units", unitSystem);
+    history.setUnitSystem(unitSystem);
     renderCurrentReport();
     relabelCards();
   });
@@ -956,72 +959,6 @@ function updateTabStates(): void {
 }
 
 // ---- history ----------------------------------------------------------------
-function setupHistory(): void {
-  if (!window.garage) return;
-  document.querySelector('[data-tab="history"]')?.addEventListener("click", () => void loadHistory());
-  $("btn-history-refresh").addEventListener("click", () => void loadHistory());
-  $("btn-history-clear").addEventListener("click", async () => {
-    await window.garage.history.clear();
-    await loadHistory();
-    $("history-detail").replaceChildren();
-  });
-}
-
-async function loadHistory(): Promise<void> {
-  if (!window.garage) return;
-  const records = await window.garage.history.list();
-  const list = $("history-list");
-  list.replaceChildren();
-  if (records.length === 0) {
-    const li = document.createElement("li");
-    li.className = "muted";
-    li.textContent = "No saved scans yet. Run a diagnostic scan and it will appear here.";
-    list.appendChild(li);
-    return;
-  }
-  records.forEach((record, i) => {
-    try {
-      list.appendChild(historyItem(record, i));
-    } catch (err) {
-      console.warn("Failed to render history record:", errMsg(err));
-    }
-  });
-}
-
-function historyItem(record: HistoryRecord, index: number): HTMLElement {
-  const snap = record.snapshot as DiagnosticSnapshot;
-  const li = document.createElement("li");
-  const btn = document.createElement("button");
-  btn.className = "history-item";
-  const when = new Date(record.savedAt).toLocaleString();
-  const codes = snap.storedDtcs.length > 0 ? snap.storedDtcs.join(", ") : "no codes";
-  const mil = snap.milOn ? "MIL ON" : "MIL off";
-  const top = document.createElement("div");
-  top.className = "history-when";
-  top.textContent = when;
-  const sub = document.createElement("div");
-  sub.className = "history-sub";
-  sub.textContent = `${mil} · ${snap.reportedDtcCount} DTC${snap.reportedDtcCount === 1 ? "" : "s"} · ${codes}${snap.vin ? ` · ${snap.vin}` : ""}`;
-  btn.append(top, sub);
-  // Red timeline dot when this scan had the MIL on or stored codes; green if clean.
-  if (snap.milOn || snap.storedDtcs.length > 0) btn.classList.add("is-alert");
-  btn.addEventListener("click", () => {
-    for (const el of document.querySelectorAll(".history-item")) el.classList.remove("history-item--active");
-    btn.classList.add("history-item--active");
-    showHistoryRecord(record);
-  });
-  if (index === 0) {
-    btn.classList.add("history-item--active");
-    showHistoryRecord(record);
-  }
-  li.appendChild(btn);
-  return li;
-}
-
-function showHistoryRecord(record: HistoryRecord): void {
-  const report = buildReport(record.snapshot as DiagnosticSnapshot, record.label, unitSystem);
-  renderReport($("history-detail"), report.headline, report.sections, report.caveats, report.text);
-}
 
 async function setupAbout(): Promise<void> {
   if (!window.garage) return;
@@ -1066,10 +1003,12 @@ function main(): void {
   vin = new VinViewController("vin-result", "vin-online", "vin-input");
   vin.setup("btn-vin-check", "btn-vin-online");
 
+  history = new HistoryViewController("history-list", "history-detail", renderReport);
+  history.setup('[data-tab="history"]', "btn-history-refresh", "btn-history-clear");
+
   setupTabs();
   setupPicker();
   setupUnits();
-  setupHistory();
   setupTune();
   void setupAbout();
   $("btn-connect").addEventListener("click", () => void connectSerial());
