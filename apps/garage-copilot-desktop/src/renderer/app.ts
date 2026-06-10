@@ -22,19 +22,15 @@ import {
 } from "./core.js";
 import { WebSerialTransport } from "./web-serial.js";
 import { toCsv, lineSeverityClass, dtcSearchUrl, dtcCodeInLine, boundedPush } from "./format.js";
-import { VinViewController, metricsCard } from "./vin-view.js";
+import { VinViewController } from "./vin-view.js";
 import { HistoryViewController } from "./history-view.js";
 import { TuneAdvisorController } from "./tune-forms.js";
-import { infoLine, errorLine, errMsg } from "./ui-helpers.js";
+import { infoLine, errorLine, errMsg, getElement, numFrom as numFromUI, clamp } from "./ui-helpers.js";
 import type { SerialPortInfo, HistoryRecord } from "../shared/ipc.js";
 
 // ---- tiny DOM helpers -------------------------------------------------------
-const $ = <T extends HTMLElement = HTMLElement>(id: string): T => {
-  const el = document.getElementById(id);
-  if (!el) throw new Error(`Missing element #${id}`);
-  return el as T;
-};
-const numFrom = (id: string): number => Number($<HTMLInputElement>(id).value);
+const $ = getElement; // Alias to reduce diff
+const numFrom = numFromUI; // Alias to reduce diff
 const show = (el: HTMLElement, visible: boolean): void => {
   el.hidden = !visible;
 };
@@ -660,10 +656,6 @@ function fitCanvas(canvas: HTMLCanvasElement): CanvasRenderingContext2D | null {
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   return ctx;
-}
-
-function clamp(n: number, lo: number, hi: number): number {
-  return Math.max(lo, Math.min(hi, n));
 }
 
 /** Stroke an arc with a given colour/width (used by the radial gauges). */

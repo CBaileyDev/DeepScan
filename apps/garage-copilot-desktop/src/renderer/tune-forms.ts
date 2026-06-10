@@ -9,7 +9,7 @@ import {
   assessAddedElectricalLoad,
   type Assessment
 } from "./core.js";
-import { errorLine, errMsg } from "./ui-helpers.js";
+import { errorLine, errMsg, getElement, numFrom, clamp } from "./ui-helpers.js";
 
 type Zone = "ok" | "watch" | "warn";
 
@@ -60,26 +60,13 @@ export class TuneAdvisorController {
     loadResultId: string,
     injSizeInputId: string
   ) {
-    this.fdButton = this.getElement(fdButtonId);
-    this.fdResultEl = this.getElement(fdResultId);
-    this.injButton = this.getElement(injButtonId);
-    this.injResultEl = this.getElement(injResultId);
-    this.loadButton = this.getElement(loadButtonId);
-    this.loadResultEl = this.getElement(loadResultId);
-    this.injSizeInput = this.getElement<HTMLInputElement>(injSizeInputId);
-  }
-
-  private getElement<T extends HTMLElement = HTMLElement>(id: string): T {
-    const el = document.getElementById(id);
-    if (!el) throw new Error(`Missing element #${id}`);
-    return el as T;
-  }
-
-  private numFrom(id: string): number {
-    const el = document.getElementById(id);
-    if (!el) return 0;
-    const inp = el as HTMLInputElement;
-    return Number(inp.value);
+    this.fdButton = getElement(fdButtonId);
+    this.fdResultEl = getElement(fdResultId);
+    this.injButton = getElement(injButtonId);
+    this.injResultEl = getElement(injResultId);
+    this.loadButton = getElement(loadButtonId);
+    this.loadResultEl = getElement(loadResultId);
+    this.injSizeInput = getElement<HTMLInputElement>(injSizeInputId);
   }
 
   setup(): void {
@@ -93,11 +80,11 @@ export class TuneAdvisorController {
       this.fdResultEl,
       () =>
         assessFinalDriveChange({
-          speedMph: this.numFrom("fd-speed"),
-          tireDiameterIn: this.numFrom("fd-tire"),
-          topGearRatio: this.numFrom("fd-gear"),
-          currentFinalDrive: this.numFrom("fd-from"),
-          newFinalDrive: this.numFrom("fd-to")
+          speedMph: numFrom("fd-speed"),
+          tireDiameterIn: numFrom("fd-tire"),
+          topGearRatio: numFrom("fd-gear"),
+          currentFinalDrive: numFrom("fd-from"),
+          newFinalDrive: numFrom("fd-to")
         })
     );
   }
@@ -108,8 +95,8 @@ export class TuneAdvisorController {
       () => {
         const proposed = this.injSizeInput.value.trim();
         return assessInjectorsForTarget({
-          targetHp: this.numFrom("inj-hp"),
-          cylinders: this.numFrom("inj-cyl"),
+          targetHp: numFrom("inj-hp"),
+          cylinders: numFrom("inj-cyl"),
           proposedCcMin: proposed === "" ? undefined : Number(proposed)
         });
       }
@@ -121,10 +108,10 @@ export class TuneAdvisorController {
       this.loadResultEl,
       () =>
         assessAddedElectricalLoad({
-          systemVoltage: this.numFrom("load-volt"),
-          existingLoadA: this.numFrom("load-existing"),
-          addedWatts: this.numFrom("load-watts"),
-          alternatorRatedA: this.numFrom("load-alt")
+          systemVoltage: numFrom("load-volt"),
+          existingLoadA: numFrom("load-existing"),
+          addedWatts: numFrom("load-watts"),
+          alternatorRatedA: numFrom("load-alt")
         })
     );
   }
@@ -256,8 +243,4 @@ function buildTuneBar(d: Record<string, number | string>): HTMLElement | null {
     ]);
   }
   return null;
-}
-
-function clamp(v: number, min: number, max: number): number {
-  return Math.min(Math.max(v, min), max);
 }

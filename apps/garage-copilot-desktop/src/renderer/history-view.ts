@@ -4,7 +4,7 @@
  */
 
 import { buildReport, type UnitSystem, type DiagnosticSnapshot } from "./core.js";
-import { errMsg } from "./ui-helpers.js";
+import { errMsg, getElement } from "./ui-helpers.js";
 import type { HistoryRecord } from "../shared/ipc.js";
 
 type ReportRenderer = (
@@ -22,15 +22,9 @@ export class HistoryViewController {
   private renderReportFn: ReportRenderer;
 
   constructor(listElementId: string, detailElementId: string, renderReportFn: ReportRenderer) {
-    this.historyListEl = this.getElement(listElementId);
-    this.historyDetailEl = this.getElement(detailElementId);
+    this.historyListEl = getElement(listElementId);
+    this.historyDetailEl = getElement(detailElementId);
     this.renderReportFn = renderReportFn;
-  }
-
-  private getElement(id: string): HTMLElement {
-    const el = document.getElementById(id);
-    if (!el) throw new Error(`Missing element #${id}`);
-    return el;
   }
 
   setUnitSystem(units: UnitSystem): void {
@@ -38,23 +32,31 @@ export class HistoryViewController {
   }
 
   setup(tabSelector: string, refreshButtonId: string, clearButtonId: string): void {
-    const tabBtn = document.querySelector<HTMLElement>(tabSelector);
-    if (tabBtn) {
-      tabBtn.addEventListener("click", () => void this.loadHistory());
+    try {
+      const tabBtn = document.querySelector<HTMLElement>(tabSelector);
+      if (tabBtn) {
+        tabBtn.addEventListener("click", () => void this.loadHistory());
+      }
+    } catch {
+      // Tab selector optional
     }
 
-    const refreshBtn = document.getElementById(refreshButtonId);
-    if (refreshBtn) {
+    try {
+      const refreshBtn = getElement(refreshButtonId);
       refreshBtn.addEventListener("click", () => void this.loadHistory());
+    } catch {
+      // Button optional
     }
 
-    const clearBtn = document.getElementById(clearButtonId);
-    if (clearBtn) {
+    try {
+      const clearBtn = getElement(clearButtonId);
       clearBtn.addEventListener("click", async () => {
         await window.garage?.history.clear();
         await this.loadHistory();
         this.historyDetailEl.replaceChildren();
       });
+    } catch {
+      // Button optional
     }
   }
 

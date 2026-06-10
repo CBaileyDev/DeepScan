@@ -4,7 +4,7 @@
  */
 
 import { decodeVin, type VinDecode } from "./core.js";
-import { infoLine, errorLine, errMsg } from "./ui-helpers.js";
+import { infoLine, errorLine, errMsg, getElement, metricsCard } from "./ui-helpers.js";
 
 export class VinViewController {
   private vehicleMake: string | undefined;
@@ -17,15 +17,9 @@ export class VinViewController {
     onlineElementId: string,
     inputElementId: string
   ) {
-    this.resultEl = this.getElement(resultElementId);
-    this.onlineEl = this.getElement(onlineElementId);
-    this.inputEl = this.getElement<HTMLInputElement>(inputElementId);
-  }
-
-  private getElement<T extends HTMLElement = HTMLElement>(id: string): T {
-    const el = document.getElementById(id);
-    if (!el) throw new Error(`Missing element #${id}`);
-    return el as T;
+    this.resultEl = getElement(resultElementId);
+    this.onlineEl = getElement(onlineElementId);
+    this.inputEl = getElement<HTMLInputElement>(inputElementId);
   }
 
   get make(): string | undefined {
@@ -42,8 +36,8 @@ export class VinViewController {
   }
 
   setup(checkButtonId: string, onlineButtonId: string): void {
-    const checkBtn = this.getElement(checkButtonId);
-    const onlineBtn = this.getElement(onlineButtonId);
+    const checkBtn = getElement(checkButtonId);
+    const onlineBtn = getElement(onlineButtonId);
 
     checkBtn.addEventListener("click", () => this.checkVin());
     this.inputEl.addEventListener("keydown", (e) => {
@@ -156,27 +150,3 @@ export class VinViewController {
     }
   }
 }
-
-/** Build a card of label/value metric rows, skipping blank values. */
-export function metricsCard(rows: Array<[string, string | undefined]>): HTMLElement {
-  const card = document.createElement("div");
-  card.className = "card";
-  const grid = document.createElement("div");
-  grid.className = "metrics";
-  for (const [key, value] of rows) {
-    if (!value || value.trim() === "") continue;
-    const row = document.createElement("div");
-    row.className = "metric";
-    const k = document.createElement("span");
-    k.className = "metric-key";
-    k.textContent = key;
-    const v = document.createElement("span");
-    v.className = "metric-val";
-    v.textContent = value;
-    row.append(k, v);
-    grid.appendChild(row);
-  }
-  card.appendChild(grid);
-  return card;
-}
-
