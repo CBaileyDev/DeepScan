@@ -49,6 +49,7 @@ const TREND_CAVEAT =
 
 /** SAE J1979 Mode 01 PIDs referenced by the heuristics below. */
 const PID = {
+  ENGINE_RPM: "0C",
   SHORT_TERM_FUEL_TRIM_B1: "06",
   LONG_TERM_FUEL_TRIM_B1: "07",
   COOLANT_TEMP: "05",
@@ -160,9 +161,10 @@ export function analyzeTrends(samples: TimedSample[]): TrendReport {
     });
   }
 
-  // Charging voltage (42).
+  // Charging voltage (42): only warn if engine is running (RPM > 0).
   const volt = byPid.get(PID.CONTROL_MODULE_VOLTAGE);
-  if (volt && volt.avg < CHARGING_MIN_V) {
+  const rpm = byPid.get(PID.ENGINE_RPM);
+  if (volt && rpm && rpm.avg > 0 && volt.avg < CHARGING_MIN_V) {
     flags.push({
       severity: "watch",
       parameter: "Charging voltage",

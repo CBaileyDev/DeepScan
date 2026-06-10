@@ -6,10 +6,10 @@
 # a Mac target off Windows, etc.); the desktop-release workflow does all three on
 # native GitHub runners. Output goes to release/ so it doesn't collide with
 # esbuild's dist/ bundles.
-appId: com.cbaileydev.garagecopilot
-productName: Garage Copilot
+appId: com.deepscan.app
+productName: DeepScan
 # Deterministic binary name on Windows/Linux (mac uses the .app bundle name).
-executableName: garage-copilot
+executableName: deepscan
 directories:
   output: release
 # Everything the app needs at runtime is bundled into dist/ by esbuild (the
@@ -29,7 +29,7 @@ mac:
   # Unsigned local build. For distribution, configure signing/notarization.
   identity: null
 dmg:
-  title: Garage Copilot
+  title: DeepScan
 win:
   icon: build/icon.png
   target:
@@ -46,8 +46,8 @@ linux:
   category: Utility
   synopsis: Read-only OBD-II diagnostics, monitoring, and tune advice
   # The .deb target requires a maintainer; a clean artifact name avoids the
-  # scoped package name (@cbaileydev/…) leaking into the file.
-  maintainer: CBaileyDev <cbaileydev@users.noreply.github.com>
+  # scoped package name (@deepscan/…) leaking into the file.
+  maintainer: DeepScan Contributors <deepscan@users.noreply.github.com>
   artifactName: ${productName}-${version}.${ext}
   target:
     - AppImage

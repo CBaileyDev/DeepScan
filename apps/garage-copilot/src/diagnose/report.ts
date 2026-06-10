@@ -127,7 +127,7 @@ export function buildReport(
     "This is EVIDENCE, not a repair diagnosis. Confirm against service information for the specific vehicle.",
     "DTC entries are decoded structurally only; manufacturer-specific (P1xxx, etc.) meanings are not included — look them up, don't guess.",
     "Readiness state does NOT predict an emissions-inspection result.",
-    "Garage Copilot is read-only: it never clears codes or writes to the ECU."
+    "DeepScan is read-only: it never clears codes or writes to the ECU."
   ];
 
   const text = render(headline, sections, caveats);

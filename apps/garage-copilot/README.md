@@ -1,16 +1,13 @@
-# Garage Copilot
+# DeepScan Engine
 
-The piece that connects the **brain to the car**. The MCP servers in this repo
-are a knowledge-and-reasoning layer; Garage Copilot is the application that talks
-to a real OBD-II adapter, turns what the car reports into structured evidence,
-and wires every server into one Claude session so the model can reason across
-all of them.
+The OBD-II diagnostic engine for DeepScan. This module talks to a real OBD-II adapter
+(ELM327), turns what the car reports into structured evidence, and provides three
+core capabilities: **diagnose**, **monitor**, and **tune-advise**.
 
-It does three things — **diagnose**, **monitor**, and **tune-advise** — and it
-runs fully offline (no hardware, no API key) via a built-in replay adapter, so
-you can try the whole flow right now.
+It runs fully offline (no hardware needed) via a built-in replay adapter, so
+you can try the whole flow right now without any hardware.
 
-> **Read-only by design.** Garage Copilot only issues OBD *read* services. It
+> **Read-only by design.** DeepScan only issues OBD *read* services. It
 > never clears codes, writes to an ECU, or runs active tests. The "tune" feature
 > is a planning **advisor** (math that validates a proposed change) — it does not
 > flash anything. See [Safety & legal](#safety--legal).
@@ -44,54 +41,45 @@ npm run build
 # Offline demo — replays a canned vehicle (MIL on, P0301 + P0420):
 node dist/cli.js diagnose --vehicle "2014 Subaru Forester"
 
-# Real hardware — plug in an ELM327 dongle and install the serial driver:
+# Real hardware — plug in an ELM327 dongle (install the serial driver first):
 npm install serialport
 node dist/cli.js diagnose --port /dev/ttyUSB0          # macOS: /dev/tty.usbserial-…  Windows: COM3
 ```
 
-During development you can skip the build with `npm run dev -- diagnose`.
+During development, skip the build with `npm run dev -- diagnose`.
 
 ## CLI
 
 ```text
-garage-copilot diagnose    [--port PATH | --demo] [--baud N] [--vehicle "label"]
-garage-copilot monitor     [--port PATH | --demo] [--rounds N] [--interval MS] [--pids 0C,05,...]
-garage-copilot advise      final-drive --speed --tire --gear --from --to
-                           injectors   --hp --cylinders [--bsfc --duty --density --injector]
-                           load        --voltage --existing --watts --alt
-garage-copilot mcp-config  [--root /abs/path/to/MCPs]
-garage-copilot playbook    [--vehicle "label"]
+deepscan diagnose    [--port PATH | --demo] [--baud N] [--vehicle "label"]
+deepscan monitor     [--port PATH | --demo] [--rounds N] [--interval MS] [--pids 0C,05,...]
+deepscan advise      final-drive --speed --tire --gear --from --to
+                     injectors   --hp --cylinders [--bsfc --duty --density --injector]
+                     load        --voltage --existing --watts --alt
+deepscan mcp-config  [--root /abs/path/to/MCPs]
+deepscan playbook    [--vehicle "label"]
 ```
 
 With no `--port`, `diagnose`/`monitor` use the offline demo adapter.
 
-## Using it with Claude (the "+ Claude" part)
+## Using it with Claude (Optional Integration)
 
-Garage Copilot produces the *evidence*; Claude does the *reasoning*, using this
-repo's servers. Two pieces make that work:
+The `mcp-config` and `playbook` commands are designed for advanced integration with
+the full MCP ecosystem. If you're using DeepScan standalone, you can ignore these.
 
-1. **`mcp-config`** generates the combined MCP-client config for every server:
+If you have the full MCPs repo set up:
+
+1. **`mcp-config`** generates a combined MCP-client config:
 
    ```bash
-   node dist/cli.js mcp-config --root /ABS/PATH/TO/MCPs > ~/garage-mcp.json
+   node dist/cli.js mcp-config --root /ABS/PATH/TO/MCPs > ~/deepscan-mcp.json
    ```
 
-   Point Claude Desktop/Code at those servers (see
-   [`docs/USING-WITH-CLIENTS.md`](../../docs/USING-WITH-CLIENTS.md)). First build
-   the servers you want with `npm install && npm run build` in each.
-
-2. **`playbook`** prints the system prompt that tells Claude how to chain the
-   servers around a snapshot — identify the vehicle (vpic), check recalls
-   (repair-info), reason about live data (engine-build-math / automotive-
-   electrical), find parts (part-interchange), and log it (garage-memory):
+2. **`playbook`** generates a system prompt for Claude:
 
    ```bash
    node dist/cli.js playbook --vehicle "2014 Subaru Forester"
    ```
-
-   A typical loop: run `diagnose`, paste the report into a Claude session
-   primed with the playbook and wired to the servers, and let it work the
-   evidence into a ranked, confirm-the-cheapest-test-first action plan.
 
 The same building blocks are exported from `src/index.ts`, so a host built on the
 [Claude Agent SDK](https://docs.claude.com/en/api/agent-sdk) can embed the driver

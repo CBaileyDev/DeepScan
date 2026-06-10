@@ -1,7 +1,7 @@
 /**
  * An in-memory {@link ObdTransport} that replays scripted responses.
  *
- * This is what lets Garage Copilot run end-to-end with NO hardware: the CLI's
+ * This is what lets DeepScan run end-to-end with NO hardware: the CLI's
  * `--demo` mode and the test suite both drive the real Elm327Client through this
  * transport. A script maps a normalized command (uppercase, whitespace removed,
  * trailing "\r" dropped) to a response body; the transport appends the ELM327

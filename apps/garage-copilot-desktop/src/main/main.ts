@@ -37,7 +37,7 @@ function isTrustedSender(event: IpcMainEvent | IpcMainInvokeEvent): boolean {
 }
 
 const HISTORY_CAP = 100;
-const historyFile = (): string => join(app.getPath("userData"), "garage-copilot-history.json");
+const historyFile = (): string => join(app.getPath("userData"), "deepscan-history.json");
 
 async function readHistory(): Promise<HistoryRecord[]> {
   try {
@@ -112,7 +112,7 @@ function createWindow(): BrowserWindow {
     minWidth: 900,
     minHeight: 640,
     backgroundColor: "#0d1117",
-    title: "Garage Copilot",
+    title: "DeepScan",
     webPreferences: {
       preload: appPath("dist", "main", "preload.cjs"),
       contextIsolation: true,

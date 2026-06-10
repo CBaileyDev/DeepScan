@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Garage Copilot CLI.
+ * DeepScan CLI.
  *
  * Commands:
  *   diagnose   Run a read-only diagnostic pass and print a report.
@@ -185,13 +185,20 @@ function cmdAdvise(f: Flags): void {
       );
       break;
     default:
-      console.error("Usage: garage-copilot advise <final-drive|injectors|load> [flags]");
+      console.error("Usage: deepscan advise <final-drive|injectors|load> [flags]");
       process.exitCode = 1;
   }
 }
 
 function cmdMcpConfig(f: Flags): void {
   const root = typeof f.flags.root === "string" ? f.flags.root : findRepoRoot(process.cwd());
+  // Warn if servers/ not found (DeepScan may not have MCP integration)
+  if (!existsSync(join(root, "servers"))) {
+    console.warn("⚠ No servers/ folder found at:", root);
+    console.warn("  This command is designed for the full MCPs repo with MCP servers installed.");
+    console.warn("  If you have MCP servers set up elsewhere, use: deepscan mcp-config --root /path/to/MCPs");
+    console.warn("");
+  }
   console.log(renderMcpConfig(root));
 }
 
@@ -201,7 +208,7 @@ function cmdPlaybook(f: Flags): void {
 }
 
 function usage(): void {
-  console.log(`garage-copilot <command> [flags]
+  console.log(`deepscan <command> [flags]
 
 Commands:
   diagnose    [--port PATH | --demo | --sim] [--baud N] [--vehicle "label"]

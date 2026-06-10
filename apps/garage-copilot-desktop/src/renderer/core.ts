@@ -1,5 +1,5 @@
 /**
- * Re-exports the Garage Copilot engine from its built output, so the GUI reuses
+ * Re-exports the DeepScan engine from its built output, so the GUI reuses
  * the exact same tested OBD driver, decoders, diagnostic/monitor/tune logic that
  * the CLI and library use. Importing from `dist` (real .js) keeps the esbuild
  * browser bundle clean and avoids pulling in the Node-only serial transport.

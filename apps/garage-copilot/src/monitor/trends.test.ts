@@ -43,10 +43,11 @@ describe("analyzeTrends flags", () => {
 
   it("watches a mild trim and warns on overheat + low charging voltage", () => {
     const samples = [
+      ...series("0C", "RPM", [1000, 1500, 1200]), // engine running
       ...series("06", "STFT b1", [6, 6, 6]),
       ...series("07", "LTFT b1", [6, 6, 6]), // ~12% -> watch
       ...series("05", "Coolant", [90, 108, 113]), // max 113 -> warn
-      ...series("42", "Voltage", [12.4, 12.5, 12.6]) // avg 12.5 -> watch
+      ...series("42", "Voltage", [12.4, 12.5, 12.6]) // avg 12.5 with RPM > 0 -> watch
     ];
     const flags = analyzeTrends(samples).flags;
     expect(flags.find(f => f.parameter.startsWith("Fuel trim"))?.severity).toBe("watch");
@@ -60,6 +61,14 @@ describe("analyzeTrends flags", () => {
       ...series("07", "LTFT b1", [2, 1, 1]),
       ...series("05", "Coolant", [88, 90, 91]),
       ...series("42", "Voltage", [14.1, 14.2, 14.2])
+    ];
+    expect(analyzeTrends(samples).flags).toEqual([]);
+  });
+
+  it("does not flag low voltage when engine is off (RPM = 0)", () => {
+    const samples = [
+      ...series("0C", "RPM", [0, 0, 0]), // parked: engine off
+      ...series("42", "Voltage", [12.4, 12.5, 12.6]) // low voltage but no alternator spin
     ];
     expect(analyzeTrends(samples).flags).toEqual([]);
   });

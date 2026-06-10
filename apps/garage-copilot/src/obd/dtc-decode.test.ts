@@ -43,6 +43,17 @@ describe("decodeTroubleCodes / decodeDtcResponse", () => {
     expect(decodeDtcResponse(["43 03 01 04 20"], 0x43)).toEqual(["P0301", "P0420"]);
     expect(decodeDtcResponse(["43 03 01", "43 03 01"], 0x43)).toEqual(["P0301"]);
   });
+  it("appends continuation frames that do not repeat the service byte", () => {
+    // Multi-frame CAN: frame 0 carries the service byte, later frames are raw payload
+    expect(decodeDtcResponse(["43 03 01 04", "20 05 30"], 0x43)).toEqual(["P0301", "P0420", "P0530"]);
+  });
+  it("decodes each ECU's response separately when several reply", () => {
+    // Two ECUs each answer Mode 03 with their own service byte + count byte
+    expect(decodeDtcResponse(["43 01 03 01", "43 01 04 20"], 0x43, { skipCountByte: true })).toEqual([
+      "P0301",
+      "P0420"
+    ]);
+  });
   it("skips the CAN count byte so it does not become a phantom code", () => {
     // Without skipCountByte the 0x02 count would mis-pair into garbage.
     expect(decodeDtcResponse(["43 02 03 01 04 20"], 0x43)).toEqual(["P0203", "P0104"]);
