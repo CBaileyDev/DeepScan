@@ -27,7 +27,7 @@ export function convertUnit(
     case "L/h":
       return { value: round1(value * 0.2641721), unit: "gal/h" };
     case "g/s":
-      return { value: round1(value * 7.93664), unit: "lb/min" };
+      return { value: round1(value * 476.2), unit: "lb/hr" };
     default:
       return { value, unit };
   }

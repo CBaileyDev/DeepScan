@@ -67,24 +67,28 @@ export function decodeTroubleCodes(data: number[]): string[] {
  * codes right after the service byte (`43 NN <pairs>`). That byte must be
  * skipped or it pairs with the first code's high byte and yields garbage; set
  * `skipCountByte` for CAN protocols. Legacy protocols (J1850/ISO 9141/KWP) have
- * no count byte. Any ISO-TP frame index ("0:", "1:") an adapter prints for a
- * multi-frame response is stripped per line.
+ * no count byte. Multi-frame responses are concatenated first to handle
+ * continuation frames correctly (frames 1+ do not repeat the service byte).
  */
 export function decodeDtcResponse(
   lines: string[],
   service: number,
   options: { skipCountByte?: boolean } = {}
 ): string[] {
-  const codes = new Set<string>();
+  // Concatenate all lines, stripping ISO-TP frame indices ("0:", "1:", etc.)
+  const allBytes: number[] = [];
   for (const raw of lines) {
-    const bytes = parseHexBytes(raw.replace(/^[0-9A-Fa-f]+:\s*/, ""));
-    const idx = bytes.indexOf(service);
-    if (idx === -1) continue;
-    let payload = bytes.slice(idx + 1);
-    if (options.skipCountByte && payload.length > 0) payload = payload.slice(1);
-    for (const code of decodeTroubleCodes(payload)) codes.add(code);
+    const cleaned = raw.replace(/^[0-9A-Fa-f]+:\s*/, "");
+    const bytes = parseHexBytes(cleaned);
+    allBytes.push(...bytes);
   }
-  return [...codes];
+
+  const idx = allBytes.indexOf(service);
+  if (idx === -1) return [];
+
+  let payload = allBytes.slice(idx + 1);
+  if (options.skipCountByte && payload.length > 0) payload = payload.slice(1);
+  return decodeTroubleCodes(payload);
 }
 
 /** Monitor (I/M readiness) state for one monitor. */

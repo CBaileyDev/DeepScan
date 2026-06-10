@@ -39,9 +39,10 @@ describe("decodeTroubleCodes / decodeDtcResponse", () => {
   it("reads pairs and drops padding", () => {
     expect(decodeTroubleCodes([0x03, 0x01, 0x04, 0x20, 0x00, 0x00])).toEqual(["P0301", "P0420"]);
   });
-  it("strips the service header and dedupes across lines", () => {
+  it("strips the service header and handles multi-frame responses", () => {
     expect(decodeDtcResponse(["43 03 01 04 20"], 0x43)).toEqual(["P0301", "P0420"]);
-    expect(decodeDtcResponse(["43 03 01", "43 03 01"], 0x43)).toEqual(["P0301"]);
+    // Multi-frame CAN: frame 0 has service byte, continuation frames do not repeat it
+    expect(decodeDtcResponse(["43 03 01 04", "20 05 30"], 0x43)).toEqual(["P0301", "P0420", "P0530"]);
   });
   it("skips the CAN count byte so it does not become a phantom code", () => {
     // Without skipCountByte the 0x02 count would mis-pair into garbage.
