@@ -51,13 +51,23 @@ export class WebSerialTransport implements ObdTransport {
 
   /** Open the port and start pumping bytes to listeners. Call once before use. */
   async start(): Promise<void> {
-    await this.port.open({ baudRate: this.baudRate });
-    if (!this.port.writable || !this.port.readable) {
-      throw new Error("Serial port did not expose readable/writable streams.");
+    try {
+      await this.port.open({ baudRate: this.baudRate });
+      if (!this.port.writable || !this.port.readable) {
+        throw new Error("Serial port did not expose readable/writable streams.");
+      }
+      this.writer = this.port.writable.getWriter();
+      this.reader = this.port.readable.getReader();
+      this.pumpDone = this.pump();
+    } catch (err) {
+      // Close the port if start() fails to prevent resource leak.
+      try {
+        await this.port.close();
+      } catch {
+        /* ignore */
+      }
+      throw err;
     }
-    this.writer = this.port.writable.getWriter();
-    this.reader = this.port.readable.getReader();
-    this.pumpDone = this.pump();
   }
 
   private async pump(): Promise<void> {

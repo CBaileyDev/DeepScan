@@ -44,6 +44,7 @@ const show = (el: HTMLElement, visible: boolean): void => {
 // ---- connection state -------------------------------------------------------
 type Connection = { client: ObdReader; label: string; demo: boolean };
 let conn: Connection | null = null;
+let connectInFlight = false;
 let unitSystem: UnitSystem = "metric";
 let lastSnapshot: DiagnosticSnapshot | null = null;
 let lastLabel: string | undefined;
@@ -198,10 +199,15 @@ async function discoverMonitorPids(client: ObdReader): Promise<string[]> {
 }
 
 async function connectSerial(): Promise<void> {
+  if (connectInFlight) {
+    setStatus("Connection in progress — please wait.", "connecting");
+    return;
+  }
   if (!("serial" in navigator)) {
     setStatus("Web Serial unavailable — open in Chrome/Edge or the desktop app.", "off");
     return;
   }
+  connectInFlight = true;
   setStatus("Select your adapter…", "connecting");
   try {
     const port = await navigator.serial.requestPort();
@@ -221,12 +227,23 @@ async function connectSerial(): Promise<void> {
     );
   } catch (err) {
     setStatus(`No adapter selected (${errMsg(err)})`, "off");
+  } finally {
+    connectInFlight = false;
   }
 }
 
 async function connectDemo(): Promise<void> {
-  // A simulator with time-varying idle data, so the live monitor actually moves.
-  await activate(new SimulatedObdReader(), "Demo (simulated)", true);
+  if (connectInFlight) {
+    setStatus("Connection in progress — please wait.", "connecting");
+    return;
+  }
+  connectInFlight = true;
+  try {
+    // A simulator with time-varying idle data, so the live monitor actually moves.
+    await activate(new SimulatedObdReader(), "Demo (simulated)", true);
+  } finally {
+    connectInFlight = false;
+  }
 }
 
 async function disconnect(): Promise<void> {
@@ -239,6 +256,7 @@ async function disconnect(): Promise<void> {
     }
   }
   conn = null;
+  connectInFlight = false;
   show($("btn-live-export"), false);
   setStatus("Disconnected", "off");
   setConnectedUi(false);
@@ -253,6 +271,7 @@ function handleTransportLost(): void {
   if (!conn) return; // already disconnected
   stopLive();
   conn = null;
+  connectInFlight = false;
   show($("btn-live-export"), false);
   setStatus("Adapter disconnected — check the cable, then reconnect.", "off");
   setConnectedUi(false);
@@ -1069,7 +1088,13 @@ async function loadHistory(): Promise<void> {
     list.appendChild(li);
     return;
   }
-  records.forEach((record, i) => list.appendChild(historyItem(record, i)));
+  records.forEach((record, i) => {
+    try {
+      list.appendChild(historyItem(record, i));
+    } catch (err) {
+      console.warn("Failed to render history record:", errMsg(err));
+    }
+  });
 }
 
 function historyItem(record: HistoryRecord, index: number): HTMLElement {
