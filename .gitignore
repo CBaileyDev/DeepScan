@@ -1,12 +1,39 @@
+# Dependencies
 node_modules/
+package-lock.json
+
+# Build outputs
 dist/
-*.log
-.DS_Store
+*.tsbuildinfo
 /release
-*.env
+out/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
 .vscode/settings.json
+.idea/
 *.swp
 *.swo
 *~
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Testing
+coverage/
+.nyc_output/
+
+# Tools
 .eslintcache
 .turbo
