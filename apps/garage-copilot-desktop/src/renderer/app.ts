@@ -13,21 +13,19 @@ import {
   runDiagnosticSession,
   buildReport,
   analyzeTrends,
-  assessFinalDriveChange,
-  assessInjectorsForTarget,
-  assessAddedElectricalLoad,
   PID_FORMULAS,
   convertUnit,
-  decodeVin,
   type ObdReader,
-  type Assessment,
   type TimedSample,
   type UnitSystem,
-  type VinDecode,
   type DiagnosticSnapshot
 } from "./core.js";
 import { WebSerialTransport } from "./web-serial.js";
 import { toCsv, lineSeverityClass, dtcSearchUrl, dtcCodeInLine, boundedPush } from "./format.js";
+import { VinViewController, metricsCard } from "./vin-view.js";
+import { HistoryViewController } from "./history-view.js";
+import { TuneAdvisorController } from "./tune-forms.js";
+import { infoLine, errorLine, errMsg } from "./ui-helpers.js";
 import type { SerialPortInfo, HistoryRecord } from "../shared/ipc.js";
 
 // ---- tiny DOM helpers -------------------------------------------------------
@@ -48,10 +46,12 @@ let connectInFlight = false;
 let unitSystem: UnitSystem = "metric";
 let lastSnapshot: DiagnosticSnapshot | null = null;
 let lastLabel: string | undefined;
-let vehicleMake: string | undefined;
 let scanInProgress = false;
 let liveTimer: number | null = null;
 let liveSamples: TimedSample[] = [];
+let vin: VinViewController;
+let history: HistoryViewController;
+let tune: TuneAdvisorController;
 type Zone = "ok" | "watch" | "warn";
 type LiveCard = { card: HTMLElement; numEl: HTMLElement; unitEl: HTMLElement; canvas: HTMLCanvasElement };
 type HeroGauge = { canvas: HTMLCanvasElement; value: number; unit?: string };
@@ -164,7 +164,7 @@ async function activate(client: ObdReader, label: string, demo: boolean): Promis
   try {
     const id = await client.initialize();
     conn = { client, label, demo };
-    vehicleMake = undefined; // Clear any previous vPIC lookup until new scan runs
+    vin.reset(); // Clear any previous vPIC lookup until new scan runs
     // Discover which live PIDs this car actually supports so the monitor adapts
     // to the vehicle instead of polling a fixed (often unsupported) set.
     monitorPids = await discoverMonitorPids(client);
@@ -259,7 +259,7 @@ async function disconnect(): Promise<void> {
     }
   }
   conn = null;
-  vehicleMake = undefined;
+  vin.reset();
   connectInFlight = false;
   show($("btn-live-export"), false);
   setStatus("Disconnected", "off");
@@ -275,7 +275,7 @@ function handleTransportLost(): void {
   if (!conn) return; // already disconnected
   stopLive();
   conn = null;
-  vehicleMake = undefined;
+  vin.reset();
   connectInFlight = false;
   show($("btn-live-export"), false);
   setStatus("Adapter disconnected — check the cable, then reconnect.", "off");
@@ -338,8 +338,7 @@ async function runScan(): Promise<void> {
     renderCurrentReport();
     // Auto-fill the VIN Checker with the car's VIN so it's ready to validate/decode.
     if (lastSnapshot.vin) {
-      $<HTMLInputElement>("vin-input").value = lastSnapshot.vin;
-      renderVinDecode(decodeVin(lastSnapshot.vin));
+      vin.setAndCheck(lastSnapshot.vin);
     }
     // Auto-save the scan so the History tab builds up over time (Electron only).
     void window.garage?.history.save({ savedAt: Date.now(), label: lastLabel, snapshot: lastSnapshot });
@@ -355,7 +354,7 @@ async function runScan(): Promise<void> {
 /** Re-render the most recent scan with the current display units. */
 function renderCurrentReport(): void {
   if (!lastSnapshot) return;
-  const report = buildReport(lastSnapshot, lastLabel, vehicleMake, unitSystem);
+  const report = buildReport(lastSnapshot, lastLabel, vin.make, unitSystem);
   renderReport($("diagnose-output"), report.headline, report.sections, report.caveats, report.text);
 }
 
@@ -641,6 +640,7 @@ function setupUnits(): void {
   sel.addEventListener("change", () => {
     unitSystem = sel.value === "imperial" ? "imperial" : "metric";
     localStorage.setItem("units", unitSystem);
+    history.setUnitSystem(unitSystem);
     renderCurrentReport();
     relabelCards();
   });
@@ -750,321 +750,7 @@ function renderFlags(): void {
   }
 }
 
-// ---- tune advisor -----------------------------------------------------------
-// Human-readable labels + units for the assessment `details` keys, so the UI
-// never shows raw object keys like "requiredCcMin".
-const TUNE_LABELS: Record<string, string> = {
-  currentRpm: "Current cruise RPM",
-  newRpm: "New cruise RPM",
-  deltaPct: "Change",
-  requiredCcMin: "Required injector",
-  proposedCcMin: "Proposed injector",
-  headroomPct: "Headroom",
-  perInjectorLbHr: "Fuel per injector",
-  totalLbHr: "Total fuel",
-  addedAmps: "Added draw",
-  totalAmps: "Total draw",
-  utilizationPct: "Alternator load"
-};
-const TUNE_UNITS: Record<string, string> = {
-  currentRpm: "rpm",
-  newRpm: "rpm",
-  deltaPct: "%",
-  requiredCcMin: "cc/min",
-  proposedCcMin: "cc/min",
-  headroomPct: "%",
-  perInjectorLbHr: "lb/hr",
-  totalLbHr: "lb/hr",
-  addedAmps: "A",
-  totalAmps: "A",
-  utilizationPct: "%"
-};
 
-function tuneLabel(key: string): string {
-  return TUNE_LABELS[key] ?? key.replace(/([A-Z])/g, " $1").replace(/^./, c => c.toUpperCase());
-}
-function tuneValue(key: string, value: number | string): string {
-  const signed = (key === "deltaPct" || key === "headroomPct") && typeof value === "number" && value > 0 ? `+${value}` : String(value);
-  const unit = TUNE_UNITS[key];
-  return unit ? `${signed} ${unit}` : signed;
-}
-const numOf = (v: number | string): number => (typeof v === "number" ? v : Number(v));
-
-function renderAssessment(targetId: string, run: () => Assessment): void {
-  const target = $(targetId);
-  try {
-    const a = run();
-    target.replaceChildren();
-
-    const verdict = document.createElement("div");
-    verdict.className = `verdict verdict--${a.ok ? "ok" : "warn"}`;
-    verdict.textContent = a.ok ? "✓ Within limits" : "✗ Check this";
-    target.appendChild(verdict);
-
-    const summary = document.createElement("div");
-    summary.className = "verdict-summary";
-    summary.textContent = a.summary;
-    target.appendChild(summary);
-
-    const bar = buildTuneBar(a.details);
-    if (bar) target.appendChild(bar);
-
-    const metrics = document.createElement("div");
-    metrics.className = "metrics";
-    for (const [k, val] of Object.entries(a.details)) {
-      const row = document.createElement("div");
-      row.className = "metric";
-      const key = document.createElement("span");
-      key.className = "metric-key";
-      key.textContent = tuneLabel(k);
-      const value = document.createElement("span");
-      value.className = "metric-val";
-      value.textContent = tuneValue(k, val);
-      row.append(key, value);
-      metrics.appendChild(row);
-    }
-    target.appendChild(metrics);
-
-    if (a.notes.length > 0) {
-      const notes = document.createElement("ul");
-      notes.className = "tune-notes";
-      for (const note of a.notes) {
-        const li = document.createElement("li");
-        li.textContent = note;
-        notes.appendChild(li);
-      }
-      target.appendChild(notes);
-    }
-  } catch (err) {
-    target.replaceChildren(errorLine(errMsg(err)));
-  }
-}
-
-/** A labelled horizontal bar. `fill`/`marks` are 0..1 fractions of the track. */
-function makeBar(left: string, right: string, fill: number, zone: Zone, marks: Array<{ at: number; label: string }> = []): HTMLElement {
-  const wrap = document.createElement("div");
-  wrap.className = "bar-wrap";
-  const cap = document.createElement("div");
-  cap.className = "bar-caption";
-  const l = document.createElement("span");
-  l.textContent = left;
-  const r = document.createElement("span");
-  r.textContent = right;
-  cap.append(l, r);
-  wrap.appendChild(cap);
-  const bar = document.createElement("div");
-  bar.className = "bar";
-  const fillEl = document.createElement("div");
-  fillEl.className = `bar-fill${zone !== "ok" ? ` bar-fill--${zone}` : ""}`;
-  fillEl.style.width = `${clamp(fill, 0, 1) * 100}%`;
-  bar.appendChild(fillEl);
-  for (const m of marks) {
-    const mk = document.createElement("div");
-    mk.className = "bar-mark";
-    mk.style.left = `${clamp(m.at, 0, 1) * 100}%`;
-    mk.dataset.label = m.label;
-    bar.appendChild(mk);
-  }
-  wrap.appendChild(bar);
-  return wrap;
-}
-
-/** Pick a signature visual for whichever assessment this is. */
-function buildTuneBar(d: Record<string, number | string>): HTMLElement | null {
-  if ("utilizationPct" in d) {
-    const util = numOf(d.utilizationPct);
-    const zone: Zone = util >= 100 ? "warn" : util >= 80 ? "watch" : "ok";
-    return makeBar("Alternator load", `${util}%`, util / 100, zone, [
-      { at: 0.8, label: "80%" },
-      { at: 1, label: "100%" }
-    ]);
-  }
-  if ("newRpm" in d && "currentRpm" in d && "deltaPct" in d) {
-    const cur = numOf(d.currentRpm);
-    const nw = numOf(d.newRpm);
-    const scale = Math.max(cur, nw) * 1.2 || 1;
-    const zone: Zone = Math.abs(numOf(d.deltaPct)) >= 10 ? "watch" : "ok";
-    return makeBar("Cruise RPM", `${nw} rpm`, nw / scale, zone, [{ at: cur / scale, label: "now" }]);
-  }
-  if ("proposedCcMin" in d && "requiredCcMin" in d) {
-    const req = numOf(d.requiredCcMin);
-    const prop = numOf(d.proposedCcMin);
-    const frac = prop > 0 ? req / prop : 1;
-    const zone: Zone = frac > 1 ? "warn" : frac > 0.9 ? "watch" : "ok";
-    return makeBar("Injector demand at target", `${Math.round(frac * 100)}% of injector`, frac, zone, [{ at: 1, label: "max" }]);
-  }
-  return null;
-}
-
-function setupTune(): void {
-  $("btn-fd").addEventListener("click", () =>
-    renderAssessment("result-fd", () =>
-      assessFinalDriveChange({
-        speedMph: numFrom("fd-speed"),
-        tireDiameterIn: numFrom("fd-tire"),
-        topGearRatio: numFrom("fd-gear"),
-        currentFinalDrive: numFrom("fd-from"),
-        newFinalDrive: numFrom("fd-to")
-      })
-    )
-  );
-  $("btn-inj").addEventListener("click", () =>
-    renderAssessment("result-inj", () => {
-      const proposed = $<HTMLInputElement>("inj-size").value.trim();
-      return assessInjectorsForTarget({
-        targetHp: numFrom("inj-hp"),
-        cylinders: numFrom("inj-cyl"),
-        proposedCcMin: proposed === "" ? undefined : Number(proposed)
-      });
-    })
-  );
-  $("btn-load").addEventListener("click", () =>
-    renderAssessment("result-load", () =>
-      assessAddedElectricalLoad({
-        systemVoltage: numFrom("load-volt"),
-        existingLoadA: numFrom("load-existing"),
-        addedWatts: numFrom("load-watts"),
-        alternatorRatedA: numFrom("load-alt")
-      })
-    )
-  );
-}
-
-// ---- VIN checker ------------------------------------------------------------
-function setupVin(): void {
-  const input = $<HTMLInputElement>("vin-input");
-  $("btn-vin-check").addEventListener("click", () => checkVin());
-  input.addEventListener("keydown", e => {
-    if (e.key === "Enter") checkVin();
-  });
-  $("btn-vin-online").addEventListener("click", () => {
-    const decoded = decodeVin(input.value);
-    renderVinDecode(decoded);
-    // Don't spend a request on a VIN that fails the offline format check.
-    if (decoded.validation.format.ok) void vinOnlineLookup(decoded.vin, decoded.modelYear);
-  });
-}
-
-function checkVin(): void {
-  const vin = $<HTMLInputElement>("vin-input").value.trim();
-  $("vin-online").replaceChildren();
-  if (vin === "") {
-    $("vin-result").replaceChildren(infoLine("Enter a VIN to check."));
-    return;
-  }
-  renderVinDecode(decodeVin(vin));
-}
-
-/** Render the offline validation + structural decode of a VIN. */
-function renderVinDecode(d: VinDecode): void {
-  const out = $("vin-result");
-  out.replaceChildren();
-  const fmtOk = d.validation.format.ok;
-  const cd = d.validation.checkDigit;
-
-  const banner = document.createElement("div");
-  banner.className = "report-headline " + (!fmtOk ? "is-warn" : cd.matches ? "is-ok" : "");
-  const lamp = document.createElement("span");
-  lamp.className = "lamp " + (!fmtOk ? "lamp--warn" : cd.matches ? "lamp--ok" : "lamp--watch");
-  const txt = document.createElement("span");
-  txt.textContent = d.validation.assessment;
-  banner.append(lamp, txt);
-  out.appendChild(banner);
-
-  if (!fmtOk) return; // nothing structural to show on a malformed VIN
-
-  const rows: Array<[string, string | undefined]> = [
-    ["VIN", d.vin],
-    ["Country of origin", d.country],
-    ["Region", d.region],
-    ["Model year", d.modelYear ? String(d.modelYear) : undefined],
-    ["WMI (manufacturer)", d.wmi],
-    ["Plant code", d.plantCode],
-    ["Serial", d.serial],
-    ["Check digit", cd.evaluated ? `${cd.found} (expected ${cd.expected})` : undefined]
-  ];
-  out.appendChild(metricsCard(rows));
-}
-
-/** Look up the full make/model/engine online via NHTSA vPIC (the one network call). */
-async function vinOnlineLookup(vin: string, modelYear?: number): Promise<void> {
-  const out = $("vin-online");
-  out.replaceChildren(infoLine("Looking up the VIN with NHTSA vPIC…"));
-  try {
-    const yr = modelYear ? `&modelyear=${modelYear}` : "";
-    const url = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${encodeURIComponent(vin)}?format=json${yr}`;
-    // Wrap fetch in timeout (10 seconds) to avoid hanging on slow/offline networks
-    const fetchPromise = fetch(url);
-    const timeoutPromise = new Promise<Response>((_, reject) =>
-      setTimeout(() => reject(new Error("vPIC API timeout (>10s)")), 10000)
-    );
-    const res = await Promise.race([fetchPromise, timeoutPromise]);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const json = (await res.json()) as { Results?: Array<Record<string, string>> };
-    const row = json.Results?.[0];
-    if (!row) throw new Error("no result returned");
-    vehicleMake = row.Make;
-    renderVinOnline(out, row);
-  } catch (err) {
-    out.replaceChildren(errorLine(`Online lookup unavailable: ${errMsg(err)}. The offline decode above still applies.`));
-  }
-}
-
-function renderVinOnline(out: HTMLElement, row: Record<string, string>): void {
-  out.replaceChildren();
-  const head = document.createElement("div");
-  head.className = "report-headline is-ok";
-  const lamp = document.createElement("span");
-  lamp.className = "lamp lamp--ok";
-  const txt = document.createElement("span");
-  txt.textContent = "NHTSA vPIC decode";
-  head.append(lamp, txt);
-  out.appendChild(head);
-
-  const plant = [row.PlantCity, row.PlantState, row.PlantCountry].filter(v => v && v.trim()).join(", ");
-  const rows: Array<[string, string | undefined]> = [
-    ["Make", row.Make],
-    ["Model", row.Model],
-    ["Model year", row.ModelYear],
-    ["Trim", row.Trim],
-    ["Body class", row.BodyClass],
-    ["Vehicle type", row.VehicleType],
-    ["Cylinders", row.EngineCylinders],
-    ["Displacement (L)", row.DisplacementL],
-    ["Fuel", row.FuelTypePrimary],
-    ["Drive", row.DriveType],
-    ["Manufacturer", row.Manufacturer],
-    ["Plant", plant || undefined]
-  ];
-  out.appendChild(metricsCard(rows));
-
-  if (row.ErrorCode && row.ErrorCode !== "0" && row.ErrorText) {
-    out.appendChild(infoLine(`vPIC note: ${row.ErrorText}`));
-  }
-}
-
-/** Build a card of label/value metric rows, skipping blank values. */
-function metricsCard(rows: Array<[string, string | undefined]>): HTMLElement {
-  const card = document.createElement("div");
-  card.className = "card";
-  const grid = document.createElement("div");
-  grid.className = "metrics";
-  for (const [key, value] of rows) {
-    if (!value || value.trim() === "") continue;
-    const row = document.createElement("div");
-    row.className = "metric";
-    const k = document.createElement("span");
-    k.className = "metric-key";
-    k.textContent = key;
-    const v = document.createElement("span");
-    v.className = "metric-val";
-    v.textContent = value;
-    row.append(k, v);
-    grid.appendChild(row);
-  }
-  card.appendChild(grid);
-  return card;
-}
 
 // ---- tabs / misc ------------------------------------------------------------
 function setupTabs(): void {
@@ -1092,72 +778,6 @@ function updateTabStates(): void {
 }
 
 // ---- history ----------------------------------------------------------------
-function setupHistory(): void {
-  if (!window.garage) return;
-  document.querySelector('[data-tab="history"]')?.addEventListener("click", () => void loadHistory());
-  $("btn-history-refresh").addEventListener("click", () => void loadHistory());
-  $("btn-history-clear").addEventListener("click", async () => {
-    await window.garage.history.clear();
-    await loadHistory();
-    $("history-detail").replaceChildren();
-  });
-}
-
-async function loadHistory(): Promise<void> {
-  if (!window.garage) return;
-  const records = await window.garage.history.list();
-  const list = $("history-list");
-  list.replaceChildren();
-  if (records.length === 0) {
-    const li = document.createElement("li");
-    li.className = "muted";
-    li.textContent = "No saved scans yet. Run a diagnostic scan and it will appear here.";
-    list.appendChild(li);
-    return;
-  }
-  records.forEach((record, i) => {
-    try {
-      list.appendChild(historyItem(record, i));
-    } catch (err) {
-      console.warn("Failed to render history record:", errMsg(err));
-    }
-  });
-}
-
-function historyItem(record: HistoryRecord, index: number): HTMLElement {
-  const snap = record.snapshot as DiagnosticSnapshot;
-  const li = document.createElement("li");
-  const btn = document.createElement("button");
-  btn.className = "history-item";
-  const when = new Date(record.savedAt).toLocaleString();
-  const codes = snap.storedDtcs.length > 0 ? snap.storedDtcs.join(", ") : "no codes";
-  const mil = snap.milOn ? "MIL ON" : "MIL off";
-  const top = document.createElement("div");
-  top.className = "history-when";
-  top.textContent = when;
-  const sub = document.createElement("div");
-  sub.className = "history-sub";
-  sub.textContent = `${mil} · ${snap.reportedDtcCount} DTC${snap.reportedDtcCount === 1 ? "" : "s"} · ${codes}${snap.vin ? ` · ${snap.vin}` : ""}`;
-  btn.append(top, sub);
-  // Red timeline dot when this scan had the MIL on or stored codes; green if clean.
-  if (snap.milOn || snap.storedDtcs.length > 0) btn.classList.add("is-alert");
-  btn.addEventListener("click", () => {
-    for (const el of document.querySelectorAll(".history-item")) el.classList.remove("history-item--active");
-    btn.classList.add("history-item--active");
-    showHistoryRecord(record);
-  });
-  if (index === 0) {
-    btn.classList.add("history-item--active");
-    showHistoryRecord(record);
-  }
-  li.appendChild(btn);
-  return li;
-}
-
-function showHistoryRecord(record: HistoryRecord): void {
-  const report = buildReport(record.snapshot as DiagnosticSnapshot, record.label, unitSystem);
-  renderReport($("history-detail"), report.headline, report.sections, report.caveats, report.text);
-}
 
 async function setupAbout(): Promise<void> {
   if (!window.garage) return;
@@ -1169,21 +789,6 @@ async function setupAbout(): Promise<void> {
   }
 }
 
-function infoLine(text: string): HTMLElement {
-  const p = document.createElement("p");
-  p.className = "muted";
-  p.textContent = text;
-  return p;
-}
-function errorLine(text: string): HTMLElement {
-  const p = document.createElement("p");
-  p.className = "row row--warn";
-  p.textContent = text;
-  return p;
-}
-function errMsg(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
-}
 
 /** A "look up ↗" link for a DTC code, opened in the OS browser. */
 function makeDtcLink(code: string): HTMLAnchorElement {
@@ -1214,12 +819,26 @@ function milLampSvg(): SVGElement {
 
 // ---- boot -------------------------------------------------------------------
 function main(): void {
+  vin = new VinViewController("vin-result", "vin-online", "vin-input");
+  vin.setup("btn-vin-check", "btn-vin-online");
+
+  history = new HistoryViewController("history-list", "history-detail", renderReport);
+  history.setup('[data-tab="history"]', "btn-history-refresh", "btn-history-clear");
+
+  tune = new TuneAdvisorController(
+    "btn-fd",
+    "result-fd",
+    "btn-inj",
+    "result-inj",
+    "btn-load",
+    "result-load",
+    "inj-size"
+  );
+  tune.setup();
+
   setupTabs();
   setupPicker();
   setupUnits();
-  setupHistory();
-  setupTune();
-  setupVin();
   void setupAbout();
   $("btn-connect").addEventListener("click", () => void connectSerial());
   $("btn-demo").addEventListener("click", () => void connectDemo());

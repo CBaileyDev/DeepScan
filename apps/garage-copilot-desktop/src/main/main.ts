@@ -9,6 +9,7 @@
  */
 
 import { app, BrowserWindow, ipcMain, Menu, session, shell, type IpcMainEvent, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from "electron";
+import { autoUpdater } from "electron-updater";
 import { join } from "node:path";
 import { readFile, writeFile, rename, mkdir } from "node:fs/promises";
 import { IPC, type AppInfo, type HistoryRecord, type SerialPortInfo } from "../shared/ipc.js";
@@ -218,6 +219,14 @@ void app.whenReady().then(() => {
   hardenDefaultSession();
   Menu.setApplicationMenu(buildMenu());
   createWindow();
+
+  // Setup auto-updates from GitHub Releases
+  if (process.env.SKIP_AUTO_UPDATE !== "true") {
+    autoUpdater.checkForUpdatesAndNotify();
+    // Check for updates every hour
+    setInterval(() => autoUpdater.checkForUpdates(), 60 * 60 * 1000);
+  }
+
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });

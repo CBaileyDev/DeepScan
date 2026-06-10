@@ -19,6 +19,9 @@
     "stress": "electron scripts/stress.cjs",
     "test": "vitest run"
   },
+  "dependencies": {
+    "electron-updater": "^6.1.0"
+  },
   "devDependencies": {
     "@electron/fuses": "^1.8.0",
     "@types/node": "^24.0.0",
