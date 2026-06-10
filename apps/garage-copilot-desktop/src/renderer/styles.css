@@ -1,5 +1,5 @@
 /* ============================================================================
-   Garage Copilot — "Instrument Cluster" theme
+   DeepScan — "Instrument Cluster" theme
    A performance-dash look for enthusiasts and mechanics: deep instrument black,
    ignition-amber signature, a green→amber→red zone ramp, condensed display type
    and a tabular monospace "digital readout" for live values. All fonts are
@@ -106,9 +106,6 @@ body {
   height: 22px;
   color: var(--accent);
   filter: drop-shadow(0 0 6px rgba(255, 122, 24, 0.5));
-}
-.brand .brand-copilot {
-  color: var(--accent);
 }
 .conn {
   display: flex;

@@ -15,6 +15,12 @@ describe("convertUnit", () => {
     expect(convertUnit(100, "kPa", "imperial")).toEqual({ value: 14.5, unit: "psi" });
   });
 
+  it("converts flow rates for imperial", () => {
+    // MAF: 1 g/s = 7.93664 lb/hr (a healthy idle ~3 g/s ≈ 23.8 lb/hr)
+    expect(convertUnit(10, "g/s", "imperial")).toEqual({ value: 79.4, unit: "lb/hr" });
+    expect(convertUnit(10, "L/h", "imperial")).toEqual({ value: 2.6, unit: "gal/h" });
+  });
+
   it("passes through unknown or unitless values", () => {
     expect(convertUnit(812, "rpm", "imperial")).toEqual({ value: 812, unit: "rpm" });
     expect(convertUnit(50, undefined, "imperial")).toEqual({ value: 50, unit: undefined });

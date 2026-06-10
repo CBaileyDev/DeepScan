@@ -75,20 +75,30 @@ export function decodeDtcResponse(
   service: number,
   options: { skipCountByte?: boolean } = {}
 ): string[] {
-  // Concatenate all lines, stripping ISO-TP frame indices ("0:", "1:", etc.)
-  const allBytes: number[] = [];
+  // Group lines into per-ECU responses: a line containing the service byte
+  // starts a new response (each responding ECU prints its own), while a line
+  // without it is an ISO-TP continuation frame appended to the current one.
+  // ISO-TP frame indices ("0:", "1:") are stripped per line.
+  const responses: number[][] = [];
+  let current: number[] | null = null;
   for (const raw of lines) {
-    const cleaned = raw.replace(/^[0-9A-Fa-f]+:\s*/, "");
-    const bytes = parseHexBytes(cleaned);
-    allBytes.push(...bytes);
+    const bytes = parseHexBytes(raw.replace(/^[0-9A-Fa-f]+:\s*/, ""));
+    if (bytes.length === 0) continue;
+    const idx = bytes.indexOf(service);
+    if (idx !== -1) {
+      current = bytes.slice(idx + 1);
+      responses.push(current);
+    } else if (current) {
+      current.push(...bytes);
+    }
   }
 
-  const idx = allBytes.indexOf(service);
-  if (idx === -1) return [];
-
-  let payload = allBytes.slice(idx + 1);
-  if (options.skipCountByte && payload.length > 0) payload = payload.slice(1);
-  return decodeTroubleCodes(payload);
+  const codes = new Set<string>();
+  for (let payload of responses) {
+    if (options.skipCountByte && payload.length > 0) payload = payload.slice(1);
+    for (const code of decodeTroubleCodes(payload)) codes.add(code);
+  }
+  return [...codes];
 }
 
 /** Monitor (I/M readiness) state for one monitor. */

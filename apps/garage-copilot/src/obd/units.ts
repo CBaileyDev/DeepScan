@@ -27,7 +27,8 @@ export function convertUnit(
     case "L/h":
       return { value: round1(value * 0.2641721), unit: "gal/h" };
     case "g/s":
-      return { value: round1(value * 476.2), unit: "lb/hr" };
+      // 1 g/s = 3600 g/hr = 3.6 kg/hr × 2.20462 lb/kg = 7.93664 lb/hr
+      return { value: round1(value * 7.93664), unit: "lb/hr" };
     default:
       return { value, unit };
   }

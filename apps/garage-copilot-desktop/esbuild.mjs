@@ -1,6 +1,6 @@
 // Build script: bundles the Electron main + preload (CommonJS, Node platform)
 // and the renderer (ESM, browser platform), then copies static assets. The
-// renderer bundles the Garage Copilot engine straight from ../garage-copilot's
+// renderer bundles the DeepScan engine straight from ../garage-copilot's
 // built dist, so all the tested OBD logic is reused as-is.
 
 import { build } from "esbuild";
@@ -44,4 +44,4 @@ mkdirSync("dist/renderer", { recursive: true });
 copyFileSync("src/renderer/index.html", "dist/renderer/index.html");
 copyFileSync("src/renderer/styles.css", "dist/renderer/styles.css");
 
-console.log("garage-copilot-desktop: build complete");
+console.log("deepscan-desktop: build complete");

@@ -1,5 +1,5 @@
 /**
- * Garage Copilot — library entry point.
+ * DeepScan engine — library entry point.
  *
  * Re-exports the OBD bridge, diagnostic/monitor/tune engines, and agent wiring
  * so this package can be embedded in another app (e.g. a Claude Agent SDK host)

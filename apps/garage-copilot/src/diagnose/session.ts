@@ -2,7 +2,7 @@
  * Run a full read-only diagnostic pass against any {@link ObdReader} and collect
  * the evidence into a single snapshot.
  *
- * This is the deterministic core of Garage Copilot's "diagnose" capability —
+ * This is the deterministic core of DeepScan's "diagnose" capability —
  * what a tech does on first hookup: read the MIL/DTC count, pull stored/pending/
  * permanent codes, sample key live parameters, and note readiness. It does no
  * interpretation; ./report.ts turns the snapshot into a human report, and the

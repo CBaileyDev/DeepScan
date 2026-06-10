@@ -1,5 +1,5 @@
 /**
- * Renderer UI. Wires the DOM (see index.html) to the Garage Copilot engine.
+ * Renderer UI. Wires the DOM (see index.html) to the DeepScan engine.
  *
  * Connection is either a real OBD-II dongle over Web Serial, or a built-in Demo
  * (replay) adapter so the whole GUI is usable with no hardware. Everything the
