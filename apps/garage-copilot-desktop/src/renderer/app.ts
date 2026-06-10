@@ -48,6 +48,7 @@ let connectInFlight = false;
 let unitSystem: UnitSystem = "metric";
 let lastSnapshot: DiagnosticSnapshot | null = null;
 let lastLabel: string | undefined;
+let vehicleMake: string | undefined;
 let liveTimer: number | null = null;
 let liveSamples: TimedSample[] = [];
 type Zone = "ok" | "watch" | "warn";
@@ -162,6 +163,7 @@ async function activate(client: ObdReader, label: string, demo: boolean): Promis
   try {
     const id = await client.initialize();
     conn = { client, label, demo };
+    vehicleMake = undefined; // Clear any previous vPIC lookup until new scan runs
     // Discover which live PIDs this car actually supports so the monitor adapts
     // to the vehicle instead of polling a fixed (often unsupported) set.
     monitorPids = await discoverMonitorPids(client);
@@ -256,6 +258,7 @@ async function disconnect(): Promise<void> {
     }
   }
   conn = null;
+  vehicleMake = undefined;
   connectInFlight = false;
   show($("btn-live-export"), false);
   setStatus("Disconnected", "off");
@@ -271,6 +274,7 @@ function handleTransportLost(): void {
   if (!conn) return; // already disconnected
   stopLive();
   conn = null;
+  vehicleMake = undefined;
   connectInFlight = false;
   show($("btn-live-export"), false);
   setStatus("Adapter disconnected — check the cable, then reconnect.", "off");
@@ -345,7 +349,7 @@ async function runScan(): Promise<void> {
 /** Re-render the most recent scan with the current display units. */
 function renderCurrentReport(): void {
   if (!lastSnapshot) return;
-  const report = buildReport(lastSnapshot, lastLabel, unitSystem);
+  const report = buildReport(lastSnapshot, lastLabel, vehicleMake, unitSystem);
   renderReport($("diagnose-output"), report.headline, report.sections, report.caveats, report.text);
 }
 
@@ -988,6 +992,7 @@ async function vinOnlineLookup(vin: string, modelYear?: number): Promise<void> {
     const json = (await res.json()) as { Results?: Array<Record<string, string>> };
     const row = json.Results?.[0];
     if (!row) throw new Error("no result returned");
+    vehicleMake = row.Make;
     renderVinOnline(out, row);
   } catch (err) {
     out.replaceChildren(errorLine(`Online lookup unavailable: ${errMsg(err)}. The offline decode above still applies.`));
