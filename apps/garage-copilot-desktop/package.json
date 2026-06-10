@@ -15,9 +15,12 @@
     "start": "npm run build && electron .",
     "app": "electron .",
     "dist": "npm run build && electron-builder",
-    "smoke": "electron scripts/smoke.cjs",
+    "smoke": "node scripts/smoke-run.cjs",
     "stress": "electron scripts/stress.cjs",
     "test": "vitest run"
+  },
+  "dependencies": {
+    "@deepscan/engine": "*"
   },
   "devDependencies": {
     "@electron/fuses": "^1.8.0",

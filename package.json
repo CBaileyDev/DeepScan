@@ -9,21 +9,21 @@
     "apps/garage-copilot-desktop"
   ],
   "scripts": {
-    "build": "npm run build -ws",
-    "typecheck": "npm run typecheck -ws",
-    "test": "npm test -ws",
-    "lint": "eslint . --ext .ts,.tsx",
+    "build": "npm run build --workspaces",
+    "pretypecheck": "npm run build --workspace=@deepscan/engine",
+    "typecheck": "npm run typecheck --workspaces",
+    "pretest": "npm run build --workspace=@deepscan/engine",
+    "test": "npm run test --workspaces",
+    "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
     "eslint": "^9.0.0",
     "prettier": "^3.0.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^7.0.0"
+    "typescript-eslint": "^8.0.0"
   },
   "engines": {
     "node": ">=20"

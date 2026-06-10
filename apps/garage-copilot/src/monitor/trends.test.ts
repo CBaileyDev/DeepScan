@@ -71,6 +71,15 @@ describe('analyzeTrends flags', () => {
     expect(analyzeTrends(samples).flags).toEqual([]);
   });
 
+  it('flags bank 2 fuel trim independently', () => {
+    const samples = [
+      ...series('08', 'STFT b2', [14, 14, 14]),
+      ...series('09', 'LTFT b2', [14, 14, 14]),
+    ];
+    const trim = analyzeTrends(samples).flags.find((f) => f.parameter === 'Fuel trim (bank 2)');
+    expect(trim?.severity).toBe('warn');
+  });
+
   it('does not flag low voltage when engine is off (RPM = 0)', () => {
     const samples = [
       ...series('0C', 'RPM', [0, 0, 0]), // parked: engine off

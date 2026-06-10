@@ -1,5 +1,5 @@
 /**
- * Preload bridge. Exposes a tiny, typed `window.garage` surface to the renderer
+ * Preload bridge. Exposes a tiny, typed `window.deepscan` surface to the renderer
  * (no Node internals leak through). It only covers the serial-port picker
  * handshake and app info — the renderer does the OBD work itself via Web Serial.
  */
@@ -36,6 +36,6 @@ const api = {
   },
 };
 
-export type GarageBridge = typeof api;
+export type DeepScanBridge = typeof api;
 
-contextBridge.exposeInMainWorld('garage', api);
+contextBridge.exposeInMainWorld('deepscan', api);

@@ -20,6 +20,7 @@ import {
   convertUnit,
   decodeVin,
   type ObdReader,
+  type ObdIdentity,
   type Assessment,
   type TimedSample,
   type UnitSystem,
@@ -36,13 +37,16 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string): T => {
   if (!el) throw new Error(`Missing element #${id}`);
   return el as T;
 };
-const numFrom = (id: string): number => Number($<HTMLInputElement>(id).value);
+const numFrom = (id: string): number => {
+  const n = Number($<HTMLInputElement>(id).value);
+  return Number.isFinite(n) ? n : 0;
+};
 const show = (el: HTMLElement, visible: boolean): void => {
   el.hidden = !visible;
 };
 
 // ---- connection state -------------------------------------------------------
-type Connection = { client: ObdReader; label: string; demo: boolean };
+type Connection = { client: ObdReader; label: string; demo: boolean; identity: ObdIdentity };
 let conn: Connection | null = null;
 let connectInFlight = false;
 let unitSystem: UnitSystem = 'metric';
@@ -206,7 +210,7 @@ async function activate(client: ObdReader, label: string, demo: boolean): Promis
   setStatus('Initializing…', 'connecting');
   try {
     const id = await client.initialize();
-    conn = { client, label, demo };
+    conn = { client, label, demo, identity: id };
     // Discover which live PIDs this car actually supports so the monitor adapts
     // to the vehicle instead of polling a fixed (often unsupported) set.
     monitorPids = await discoverMonitorPids(client);
@@ -259,7 +263,7 @@ async function connectSerial(): Promise<void> {
     const baudRate = Number($<HTMLSelectElement>('baud').value) || 38400;
     const transport = new WebSerialTransport(port, {
       baudRate,
-      onError: () => handleTransportLost(),
+      onError: () => void handleTransportLost(),
     });
     await transport.start();
     adapterLog.length = 0;
@@ -312,24 +316,30 @@ async function disconnect(): Promise<void> {
  * to a disconnected state with a clear message instead of leaving live cards
  * frozen on stale values.
  */
-function handleTransportLost(): void {
+async function handleTransportLost(): Promise<void> {
   if (!conn) return; // already disconnected
   stopLive();
+  const client = conn.client;
   conn = null;
   connectInFlight = false;
   show($('btn-live-export'), false);
   setStatus('Adapter disconnected — check the cable, then reconnect.', 'off');
   setConnectedUi(false);
+  try {
+    await client.close();
+  } catch {
+    /* ignore */
+  }
 }
 
 // ---- serial picker modal ----------------------------------------------------
 function setupPicker(): void {
   // Only present in Electron (preload bridge). In a plain browser the native
   // chooser is shown by the OS instead.
-  if (!window.garage) return;
-  window.garage.onSerialPorts((ports) => openPicker(ports));
+  if (!window.deepscan) return;
+  window.deepscan.onSerialPorts((ports) => openPicker(ports));
   $('picker-cancel').addEventListener('click', () => {
-    window.garage.chooseSerialPort('');
+    window.deepscan.chooseSerialPort('');
     show($('picker'), false);
   });
 }
@@ -351,7 +361,7 @@ function openPicker(ports: SerialPortInfo[]): void {
     const ids = p.vendorId && p.productId ? ` (${p.vendorId}:${p.productId})` : '';
     btn.textContent = `${name}${ids}`;
     btn.addEventListener('click', () => {
-      window.garage.chooseSerialPort(p.portId);
+      window.deepscan.chooseSerialPort(p.portId);
       show($('picker'), false);
     });
     li.appendChild(btn);
@@ -370,7 +380,10 @@ async function runScan(): Promise<void> {
   btn.disabled = true;
   out.replaceChildren(infoLine('Scanning… reading status, codes, readiness, and live data.'));
   try {
-    lastSnapshot = await runDiagnosticSession(c.client);
+    lastSnapshot = await runDiagnosticSession(c.client, {
+      skipInitialize: true,
+      identity: c.identity,
+    });
     lastLabel = c.demo ? 'Demo vehicle' : undefined;
     renderCurrentReport();
     // Auto-fill the VIN Checker with the car's VIN so it's ready to validate/decode.
@@ -379,9 +392,10 @@ async function runScan(): Promise<void> {
       renderVinDecode(decodeVin(lastSnapshot.vin));
     }
     // Auto-save the scan so the History tab builds up over time (Electron only).
-    void window.garage?.history.save({
+    void window.deepscan?.history.save({
       savedAt: Date.now(),
       label: lastLabel,
+      vehicleMake,
       snapshot: lastSnapshot,
     });
   } catch (err) {
@@ -494,7 +508,7 @@ function renderReport(
   save.className = 'ghost';
   save.textContent = 'Save report (.md)';
   save.addEventListener('click', () =>
-    downloadText(fullText, 'garage-copilot-report.md', 'text/markdown')
+    downloadText(fullText, 'deepscan-report.md', 'text/markdown')
   );
 
   actions.append(copy, save);
@@ -791,7 +805,7 @@ function drawSparkline(canvas: HTMLCanvasElement, values: number[], color: strin
 
 function exportLiveCsv(): void {
   if (liveSamples.length === 0) return;
-  downloadText(toCsv(liveSamples), 'garage-copilot-live.csv', 'text/csv');
+  downloadText(toCsv(liveSamples), 'deepscan-live.csv', 'text/csv');
 }
 
 function renderFlags(): void {
@@ -1168,21 +1182,21 @@ function setupTabs(): void {
 
 // ---- history ----------------------------------------------------------------
 function setupHistory(): void {
-  if (!window.garage) return;
+  if (!window.deepscan) return;
   document
     .querySelector('[data-tab="history"]')
     ?.addEventListener('click', () => void loadHistory());
   $('btn-history-refresh').addEventListener('click', () => void loadHistory());
   $('btn-history-clear').addEventListener('click', async () => {
-    await window.garage.history.clear();
+    await window.deepscan.history.clear();
     await loadHistory();
     $('history-detail').replaceChildren();
   });
 }
 
 async function loadHistory(): Promise<void> {
-  if (!window.garage) return;
-  const records = await window.garage.history.list();
+  if (!window.deepscan) return;
+  const records = await window.deepscan.history.list();
   const list = $('history-list');
   list.replaceChildren();
   if (records.length === 0) {
@@ -1233,14 +1247,19 @@ function historyItem(record: HistoryRecord, index: number): HTMLElement {
 }
 
 function showHistoryRecord(record: HistoryRecord): void {
-  const report = buildReport(record.snapshot as DiagnosticSnapshot, record.label, unitSystem);
+  const report = buildReport(
+    record.snapshot as DiagnosticSnapshot,
+    record.label,
+    record.vehicleMake,
+    unitSystem
+  );
   renderReport($('history-detail'), report.headline, report.sections, report.caveats, report.text);
 }
 
 async function setupAbout(): Promise<void> {
-  if (!window.garage) return;
+  if (!window.deepscan) return;
   try {
-    const info = await window.garage.appInfo();
+    const info = await window.deepscan.appInfo();
     $('about-info').textContent =
       `v${info.appVersion} · Electron ${info.electron} · Chrome ${info.chrome} · ${info.platform}`;
   } catch {

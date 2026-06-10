@@ -52,6 +52,8 @@ const PID = {
   ENGINE_RPM: '0C',
   SHORT_TERM_FUEL_TRIM_B1: '06',
   LONG_TERM_FUEL_TRIM_B1: '07',
+  SHORT_TERM_FUEL_TRIM_B2: '08',
+  LONG_TERM_FUEL_TRIM_B2: '09',
   COOLANT_TEMP: '05',
   CONTROL_MODULE_VOLTAGE: '42',
 } as const;
@@ -112,9 +114,37 @@ function slopePerMinute(sorted: TimedSample[]): number {
   return den === 0 ? 0 : num / den;
 }
 
-/** Average of the latest `window` values for a PID, or undefined if none. */
-function recentAvg(stats: SeriesStats | undefined): number | undefined {
+/** Series average for a PID, or undefined if no samples. */
+function seriesAvg(stats: SeriesStats | undefined): number | undefined {
   return stats?.avg;
+}
+
+function addFuelTrimFlags(
+  flags: TrendFlag[],
+  byPid: Map<string, SeriesStats>,
+  bank: number,
+  stftPid: string,
+  ltftPid: string
+): void {
+  const stft = seriesAvg(byPid.get(stftPid));
+  const ltft = seriesAvg(byPid.get(ltftPid));
+  if (stft === undefined || ltft === undefined) return;
+  const total = round(stft + ltft);
+  const dir = total > 0 ? 'lean (ECU adding fuel)' : 'rich (ECU removing fuel)';
+  const label = `Fuel trim (bank ${bank})`;
+  if (Math.abs(total) >= FUEL_TRIM_WARN_PCT) {
+    flags.push({
+      severity: 'warn',
+      parameter: label,
+      message: `Combined trim ${total > 0 ? '+' : ''}${total}% — strongly ${dir}. Investigate vacuum leaks, MAF, fuel delivery, or O2 sensors.`,
+    });
+  } else if (Math.abs(total) >= FUEL_TRIM_WATCH_PCT) {
+    flags.push({
+      severity: 'watch',
+      parameter: label,
+      message: `Combined trim ${total > 0 ? '+' : ''}${total}% — mildly ${dir}. Worth watching.`,
+    });
+  }
 }
 
 /**
@@ -130,26 +160,9 @@ export function analyzeTrends(samples: TimedSample[]): TrendReport {
   const byPid = new Map(stats.map((s) => [s.pid, s]));
   const flags: TrendFlag[] = [];
 
-  // Fuel trim (bank 1): combine STFT (06) + LTFT (07).
-  const stft = recentAvg(byPid.get(PID.SHORT_TERM_FUEL_TRIM_B1));
-  const ltft = recentAvg(byPid.get(PID.LONG_TERM_FUEL_TRIM_B1));
-  if (stft !== undefined && ltft !== undefined) {
-    const total = round(stft + ltft);
-    const dir = total > 0 ? 'lean (ECU adding fuel)' : 'rich (ECU removing fuel)';
-    if (Math.abs(total) >= FUEL_TRIM_WARN_PCT) {
-      flags.push({
-        severity: 'warn',
-        parameter: 'Fuel trim (bank 1)',
-        message: `Combined trim ${total > 0 ? '+' : ''}${total}% — strongly ${dir}. Investigate vacuum leaks, MAF, fuel delivery, or O2 sensors.`,
-      });
-    } else if (Math.abs(total) >= FUEL_TRIM_WATCH_PCT) {
-      flags.push({
-        severity: 'watch',
-        parameter: 'Fuel trim (bank 1)',
-        message: `Combined trim ${total > 0 ? '+' : ''}${total}% — mildly ${dir}. Worth watching.`,
-      });
-    }
-  }
+  // Fuel trim per bank: combine STFT + LTFT.
+  addFuelTrimFlags(flags, byPid, 1, PID.SHORT_TERM_FUEL_TRIM_B1, PID.LONG_TERM_FUEL_TRIM_B1);
+  addFuelTrimFlags(flags, byPid, 2, PID.SHORT_TERM_FUEL_TRIM_B2, PID.LONG_TERM_FUEL_TRIM_B2);
 
   // Coolant overheat (05).
   const coolant = byPid.get(PID.COOLANT_TEMP);

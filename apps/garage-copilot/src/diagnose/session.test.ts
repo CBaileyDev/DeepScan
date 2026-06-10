@@ -57,4 +57,60 @@ describe('runDiagnosticSession tolerance', () => {
     expect(snap.warnings.some((w) => /pending DTCs/.test(w))).toBe(true);
     expect(snap.livePids.map((p) => p.pid)).toEqual(['0C']); // 05 returned undefined, skipped
   });
+
+  it('records warnings when monitor status or stored DTC reads fail', async () => {
+    const identity: ObdIdentity = { description: 'fake', protocol: 'test' };
+    const reader: ObdReader = {
+      initialize: async () => identity,
+      readMonitorStatus: async () => {
+        throw new Error('mode 01 unsupported');
+      },
+      readStoredDtcs: async () => {
+        throw new Error('mode 03 unsupported');
+      },
+      readPendingDtcs: async () => [],
+      readPermanentDtcs: async () => [],
+      readLivePid: async () => undefined,
+      readVoltage: async () => undefined,
+      close: async () => undefined,
+    };
+
+    const snap = await runDiagnosticSession(reader, { now: FIXED });
+    expect(snap.milOn).toBe(false);
+    expect(snap.storedDtcs).toEqual([]);
+    expect(snap.warnings.some((w) => /monitor status/.test(w))).toBe(true);
+    expect(snap.warnings.some((w) => /stored DTCs/.test(w))).toBe(true);
+  });
+
+  it('skips initialize when skipInitialize and identity are provided', async () => {
+    let initCalls = 0;
+    const identity: ObdIdentity = { description: 'cached', protocol: 'CAN' };
+    const status: MonitorStatus = {
+      milOn: false,
+      dtcCount: 0,
+      ignitionType: 'spark',
+      monitors: [],
+    };
+    const reader: ObdReader = {
+      initialize: async () => {
+        initCalls++;
+        return identity;
+      },
+      readMonitorStatus: async () => status,
+      readStoredDtcs: async () => [],
+      readPendingDtcs: async () => [],
+      readPermanentDtcs: async () => [],
+      readLivePid: async () => undefined,
+      readVoltage: async () => undefined,
+      close: async () => undefined,
+    };
+
+    const snap = await runDiagnosticSession(reader, {
+      skipInitialize: true,
+      identity,
+      now: FIXED,
+    });
+    expect(initCalls).toBe(0);
+    expect(snap.identity).toEqual(identity);
+  });
 });

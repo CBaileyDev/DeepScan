@@ -41,5 +41,21 @@ export type AppInfo = {
 export type HistoryRecord = {
   savedAt: number;
   label?: string;
+  /** OEM make for make-specific DTC descriptions when re-rendering history. */
+  vehicleMake?: string;
   snapshot: unknown;
 };
+
+/** Validate an IPC history payload before persisting to disk. */
+export function isValidHistoryRecord(record: unknown): record is HistoryRecord {
+  if (!record || typeof record !== 'object') return false;
+  const r = record as Record<string, unknown>;
+  return (
+    typeof r.savedAt === 'number' &&
+    Number.isFinite(r.savedAt) &&
+    (r.label === undefined || typeof r.label === 'string') &&
+    (r.vehicleMake === undefined || typeof r.vehicleMake === 'string') &&
+    r.snapshot !== undefined &&
+    typeof r.snapshot === 'object'
+  );
+}

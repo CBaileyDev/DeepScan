@@ -71,6 +71,26 @@ const ERROR_TOKENS = [
   'DATA ERROR',
 ];
 
+/** ELM327 ATDPN values 6–9 are ISO 15765-4 CAN variants. */
+export function isCanProtocol(protocol: string, protocolNumber?: number): boolean {
+  if (/CAN|15765/i.test(protocol)) return true;
+  return protocolNumber !== undefined && protocolNumber >= 6 && protocolNumber <= 9;
+}
+
+/** True when the payload after the service byte looks like a CAN DTC count prefix. */
+export function likelyCanDtcResponse(lines: string[], service: number): boolean {
+  for (const raw of lines) {
+    const bytes = parseHexBytes(raw.replace(/^[0-9A-Fa-f]+:\s*/, ''));
+    const idx = bytes.indexOf(service);
+    if (idx === -1) continue;
+    const payload = bytes.slice(idx + 1);
+    if (payload.length < 3) continue;
+    const count = payload[0];
+    if (count > 0 && count <= 0x7f && payload.length >= 1 + count * 2) return true;
+  }
+  return false;
+}
+
 export class Elm327Client implements ObdReader {
   private readonly timeoutMs: number;
   private readonly onTransaction?: (command: string, response: string[]) => void;
@@ -175,9 +195,17 @@ export class Elm327Client implements ObdReader {
     } catch {
       // Protocol description is best-effort.
     }
+    let protocolNumber: number | undefined;
+    try {
+      const pn = await this.send('ATDPN');
+      const parsed = parseInt(pn.join('').replace(/\D/g, ''), 10);
+      if (Number.isFinite(parsed) && parsed > 0) protocolNumber = parsed;
+    } catch {
+      // Numeric protocol is best-effort.
+    }
     // CAN (ISO 15765-4) DTC responses carry a leading count byte; remember so
     // readDtcMode strips it. Legacy protocols (J1850/ISO 9141/KWP) do not.
-    this.canMode = /CAN|15765/i.test(protocol);
+    this.canMode = isCanProtocol(protocol, protocolNumber);
     return { description: description.trim(), protocol };
   }
 
@@ -230,7 +258,12 @@ export class Elm327Client implements ObdReader {
     if (this.isNoData(lines)) return [];
     // Pass raw lines so any ISO-TP frame index is preserved for stripping; on CAN
     // skip the leading count byte after the service byte.
-    return decodeDtcResponse(lines, service, { skipCountByte: this.canMode });
+    let skipCountByte = this.canMode;
+    if (!skipCountByte && likelyCanDtcResponse(lines, service)) {
+      skipCountByte = true;
+      this.canMode = true;
+    }
+    return decodeDtcResponse(lines, service, { skipCountByte });
   }
 
   async readLivePid(pid: string): Promise<DecodedPid | undefined> {

@@ -32,7 +32,7 @@ describe('isAllowedExternalUrl', () => {
 
 describe('isTrustedFrameUrl', () => {
   it('trusts only file:// frames (the bundled app)', () => {
-    expect(isTrustedFrameUrl('file:///Applications/Garage%20Copilot.app/index.html')).toBe(true);
+    expect(isTrustedFrameUrl('file:///Applications/DeepScan.app/index.html')).toBe(true);
     expect(isTrustedFrameUrl('https://evil.example/')).toBe(false);
     expect(isTrustedFrameUrl(undefined)).toBe(false);
     expect(isTrustedFrameUrl('')).toBe(false);
