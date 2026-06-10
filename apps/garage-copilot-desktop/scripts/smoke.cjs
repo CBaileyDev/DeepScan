@@ -3,6 +3,8 @@
  * (Demo connect + a diagnostic scan) via executeJavaScript, and asserts the UI
  * actually wired up and produced results. Run with:
  *   xvfb-run -a electron scripts/smoke.cjs
+ * Or with performance monitoring:
+ *   xvfb-run -a electron scripts/smoke.cjs --perf
  * Exits 0 on success, non-zero on any failure — usable in CI without a display.
  */
 
@@ -11,6 +13,7 @@ const { join } = require("node:path");
 
 const root = join(__dirname, "..");
 const failures = [];
+const perfMode = process.argv.includes("--perf");
 
 // Stub the app-info channel the renderer's About tab calls (the real main.ts
 // registers this; the smoke harness provides its own minimal main).
@@ -57,6 +60,20 @@ app
     const result = await win.webContents.executeJavaScript(`(async () => {
       const sleep = (ms) => new Promise(r => setTimeout(r, ms));
       const errors = [];
+      ${perfMode ? `
+      const frameTimings = [];
+      let lastFrameTime = performance.now();
+      const perfMonitor = () => {
+        const now = performance.now();
+        const frameTime = now - lastFrameTime;
+        if (frameTime > 16) {
+          frameTimings.push({time: now, duration: frameTime});
+        }
+        lastFrameTime = now;
+        requestAnimationFrame(perfMonitor);
+      };
+      requestAnimationFrame(perfMonitor);
+      ` : ''}
       window.addEventListener('error', (e) => errors.push(String(e.message)));
 
       // 1) Demo connect.
@@ -89,11 +106,28 @@ app
         scanHasRpm: /Engine RPM/.test(scanText),
         fdHasRpm: fdText.includes('2480') || /RPM/i.test(fdText),
         historyHasEntry: /MIL ON|DTC/.test(historyText),
+        ${perfMode ? 'frameTimings,' : ''}
         errors
       };
     })()`);
 
     console.log("SMOKE_RESULT=" + JSON.stringify(result));
+
+    if (perfMode && result.frameTimings && result.frameTimings.length > 0) {
+      console.log("\n=== PERFORMANCE REPORT ===");
+      console.log(`Slow frames (>16ms): ${result.frameTimings.length}`);
+      const maxFrame = Math.max(...result.frameTimings.map(f => f.duration));
+      console.log(`Max frame time: ${maxFrame.toFixed(2)}ms`);
+      const avgFrame = result.frameTimings.reduce((sum, f) => sum + f.duration, 0) / result.frameTimings.length;
+      console.log(`Avg slow frame: ${avgFrame.toFixed(2)}ms`);
+      console.log("Sample slow frames:");
+      result.frameTimings.slice(0, 5).forEach(f => {
+        console.log(`  ${f.time.toFixed(0)}ms: ${f.duration.toFixed(2)}ms`);
+      });
+      if (maxFrame > 33) {
+        console.warn("⚠️  MAX FRAME TIME EXCEEDS 33ms (dropping below 30 fps)");
+      }
+    }
 
     if (!/Demo/.test(result.pill) || !result.pillClass.includes("pill--on")) {
       failures.push("Demo connect did not reach connected state: " + result.pill);

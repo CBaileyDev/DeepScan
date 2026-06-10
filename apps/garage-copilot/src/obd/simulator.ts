@@ -70,7 +70,18 @@ export class SimulatedObdReader implements ObdReader {
     return { pid: def.pid, label: def.label, value: round2(value), unit: def.unit };
   }
 
-  /** Plausible idle behaviour per PID. */
+  /**
+   * Plausible idle behaviour per PID. Simulates a healthy spark-ignition engine at idle
+   * with realistic transient behaviour:
+   * - RPM wander: ±35 rev/min at 1.3 Hz (engine load variation), ±8 at 4.1 Hz (fuel trim hunting)
+   * - Coolant warm-up: 15-minute exponential rise from 40°C cold start to 92°C steady-state
+   * - Oil temp: Slower warm-up (~20 min to 98°C) due to thermal inertia
+   * - Fuel trim (STFT/LTFT): Small corrections ±3-4%, jittering as PID controller hunts setpoint
+   * - Intake air temp: Slowly rises with engine bay heat (~60 min rise time)
+   * - Voltage: Oscillates ±0.12V around 14.2V (alternator ripple) at 0.5 Hz
+   * - Fuel level: Decays slightly over time to show consumption during long monitoring
+   * Total runtime produces smooth, realistic trends for live monitoring and trend analysis.
+   */
   private value(code: string): number | undefined {
     const t = this.elapsed();
     const wobble = (hz: number) => Math.sin(t * hz);

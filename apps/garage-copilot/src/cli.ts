@@ -56,6 +56,25 @@ function parseArgs(argv: string[]): Flags {
   return out;
 }
 
+/** Validate that all provided flags are known for the given command. */
+function validateFlags(command: string | undefined, flags: Record<string, string | boolean>): void {
+  const validByCommand: Record<string, Set<string>> = {
+    diagnose: new Set(["port", "demo", "sim", "baud", "vehicle"]),
+    monitor: new Set(["port", "demo", "sim", "baud", "rounds", "interval", "pids"]),
+    advise: new Set(["speed", "tire", "gear", "from", "to", "hp", "cylinders", "bsfc", "duty", "density", "injector", "voltage", "existing", "watts", "alt"]),
+    "mcp-config": new Set(["root"]),
+    playbook: new Set(["vehicle"]),
+  };
+  const validFlags = validByCommand[command as string] ?? new Set();
+  for (const flag of Object.keys(flags)) {
+    if (!validFlags.has(flag)) {
+      console.error(`Error: Unknown flag --${flag} for command '${command}'`);
+      usage();
+      process.exit(1);
+    }
+  }
+}
+
 function num(flags: Flags["flags"], key: string): number {
   const raw = flags[key];
   const n = Number(raw);
@@ -225,6 +244,7 @@ With no --port, diagnose/monitor run against the offline demo adapter.`);
 async function main(): Promise<void> {
   const f = parseArgs(process.argv.slice(2));
   const command = f._[0];
+  validateFlags(command, f.flags);
   try {
     switch (command) {
       case "diagnose":

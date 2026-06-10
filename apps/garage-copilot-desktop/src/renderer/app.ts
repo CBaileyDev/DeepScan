@@ -49,6 +49,7 @@ let unitSystem: UnitSystem = "metric";
 let lastSnapshot: DiagnosticSnapshot | null = null;
 let lastLabel: string | undefined;
 let vehicleMake: string | undefined;
+let scanInProgress = false;
 let liveTimer: number | null = null;
 let liveSamples: TimedSample[] = [];
 type Zone = "ok" | "watch" | "warn";
@@ -327,6 +328,9 @@ async function runScan(): Promise<void> {
   const out = $("diagnose-output");
   const btn = $<HTMLButtonElement>("btn-scan");
   btn.disabled = true;
+  scanInProgress = true;
+  // Disable tab switching while scan is in flight
+  updateTabStates();
   out.replaceChildren(infoLine("Scanning… reading status, codes, readiness, and live data."));
   try {
     lastSnapshot = await runDiagnosticSession(c.client);
@@ -343,6 +347,8 @@ async function runScan(): Promise<void> {
     out.replaceChildren(errorLine(`Scan failed: ${errMsg(err)}`));
   } finally {
     btn.disabled = false;
+    scanInProgress = false;
+    updateTabStates();
   }
 }
 
@@ -987,7 +993,12 @@ async function vinOnlineLookup(vin: string, modelYear?: number): Promise<void> {
   try {
     const yr = modelYear ? `&modelyear=${modelYear}` : "";
     const url = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVinValues/${encodeURIComponent(vin)}?format=json${yr}`;
-    const res = await fetch(url);
+    // Wrap fetch in timeout (10 seconds) to avoid hanging on slow/offline networks
+    const fetchPromise = fetch(url);
+    const timeoutPromise = new Promise<Response>((_, reject) =>
+      setTimeout(() => reject(new Error("vPIC API timeout (>10s)")), 10000)
+    );
+    const res = await Promise.race([fetchPromise, timeoutPromise]);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = (await res.json()) as { Results?: Array<Record<string, string>> };
     const row = json.Results?.[0];
@@ -1060,12 +1071,23 @@ function setupTabs(): void {
   const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>(".tab"));
   for (const tab of tabs) {
     tab.addEventListener("click", () => {
+      // Prevent tab switching while scan is in progress
+      if (scanInProgress) return;
       const name = tab.dataset.tab;
       for (const t of tabs) t.classList.toggle("tab--active", t === tab);
       for (const panel of document.querySelectorAll<HTMLElement>(".panel")) {
         show(panel, panel.id === `tab-${name}`);
       }
     });
+  }
+}
+
+/** Update tab disabled states based on scanInProgress. */
+function updateTabStates(): void {
+  const tabs = Array.from(document.querySelectorAll<HTMLButtonElement>(".tab"));
+  for (const tab of tabs) {
+    tab.disabled = scanInProgress;
+    tab.style.opacity = scanInProgress ? "0.5" : "1";
   }
 }
 
