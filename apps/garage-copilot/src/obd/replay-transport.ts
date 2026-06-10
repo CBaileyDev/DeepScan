@@ -8,7 +8,7 @@
  * "\r>" prompt so the driver's parser behaves exactly as it would on a wire.
  */
 
-import type { ObdTransport } from "./transport.js";
+import type { ObdTransport } from './transport.js';
 
 export type ReplayScript = Record<string, string>;
 
@@ -21,7 +21,10 @@ export type ReplayOptions = {
 
 /** Normalize a command for script lookup: uppercase, no whitespace, no CR. */
 export function normalizeCommand(command: string): string {
-  return command.replace(/[\r\n]+$/g, "").replace(/\s+/g, "").toUpperCase();
+  return command
+    .replace(/[\r\n]+$/g, '')
+    .replace(/\s+/g, '')
+    .toUpperCase();
 }
 
 export class ReplayTransport implements ObdTransport {
@@ -31,9 +34,12 @@ export class ReplayTransport implements ObdTransport {
   /** Commands received, in order — handy for assertions in tests. */
   readonly sent: string[] = [];
 
-  constructor(private readonly script: ReplayScript, options: ReplayOptions = {}) {
-    this.fallback = options.fallback ?? "NO DATA";
-    this.description = options.description ?? "replay (offline, no hardware)";
+  constructor(
+    private readonly script: ReplayScript,
+    options: ReplayOptions = {}
+  ) {
+    this.fallback = options.fallback ?? 'NO DATA';
+    this.description = options.description ?? 'replay (offline, no hardware)';
   }
 
   async write(data: string): Promise<void> {

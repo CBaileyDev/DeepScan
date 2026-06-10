@@ -14,23 +14,23 @@
  *
  * Requires the `@electron/fuses` devDependency.
  */
-const path = require("node:path");
-const fs = require("node:fs");
-const { flipFuses, FuseVersion, FuseV1Options } = require("@electron/fuses");
+const path = require('node:path');
+const fs = require('node:fs');
+const { flipFuses, FuseVersion, FuseV1Options } = require('@electron/fuses');
 
 /** Locate the packaged Electron executable to harden, per platform. */
 function resolveElectronBinary(context) {
   const { electronPlatformName, appOutDir } = context;
   const productFilename = context.packager.appInfo.productFilename;
 
-  if (electronPlatformName === "darwin" || electronPlatformName === "mas") {
+  if (electronPlatformName === 'darwin' || electronPlatformName === 'mas') {
     return path.join(appOutDir, `${productFilename}.app`);
   }
 
-  if (electronPlatformName === "win32") {
+  if (electronPlatformName === 'win32') {
     const candidate = path.join(appOutDir, `${productFilename}.exe`);
     if (fs.existsSync(candidate)) return candidate;
-    const exe = fs.readdirSync(appOutDir).find(f => f.toLowerCase().endsWith(".exe"));
+    const exe = fs.readdirSync(appOutDir).find((f) => f.toLowerCase().endsWith('.exe'));
     return exe ? path.join(appOutDir, exe) : candidate;
   }
 
@@ -40,9 +40,9 @@ function resolveElectronBinary(context) {
   if (fs.existsSync(candidate)) return candidate;
   const extensionless = fs
     .readdirSync(appOutDir)
-    .filter(f => path.extname(f) === "")
-    .map(f => path.join(appOutDir, f))
-    .find(p => {
+    .filter((f) => path.extname(f) === '')
+    .map((f) => path.join(appOutDir, f))
+    .find((p) => {
       try {
         return fs.statSync(p).isFile();
       } catch {
@@ -61,13 +61,15 @@ exports.default = async function configureFuses(context) {
     }
     await flipFuses(electronBinary, {
       version: FuseVersion.V1,
-      resetAdHocDarwinSignature: context.electronPlatformName === "darwin",
+      resetAdHocDarwinSignature: context.electronPlatformName === 'darwin',
       [FuseV1Options.RunAsNode]: false,
       [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
       [FuseV1Options.EnableNodeCliInspectArguments]: false,
-      [FuseV1Options.EnableCookieEncryption]: true
+      [FuseV1Options.EnableCookieEncryption]: true,
     });
-    console.log(`[fuses] hardened ${path.basename(electronBinary)} (${context.electronPlatformName})`);
+    console.log(
+      `[fuses] hardened ${path.basename(electronBinary)} (${context.electronPlatformName})`
+    );
   } catch (err) {
     // Hardening is best-effort; never fail packaging over it.
     console.warn(`[fuses] skipped — ${err instanceof Error ? err.message : String(err)}`);

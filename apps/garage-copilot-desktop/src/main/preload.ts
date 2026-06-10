@@ -4,8 +4,8 @@
  * handshake and app info — the renderer does the OBD work itself via Web Serial.
  */
 
-import { contextBridge, ipcRenderer } from "electron";
-import { IPC, type AppInfo, type HistoryRecord, type SerialPortInfo } from "../shared/ipc.js";
+import { contextBridge, ipcRenderer } from 'electron';
+import { IPC, type AppInfo, type HistoryRecord, type SerialPortInfo } from '../shared/ipc.js';
 
 const api = {
   /** Subscribe to the list of serial ports Electron offers; returns an unsubscribe. */
@@ -32,10 +32,10 @@ const api = {
     },
     clear(): Promise<void> {
       return ipcRenderer.invoke(IPC.HistoryClear);
-    }
-  }
+    },
+  },
 };
 
 export type GarageBridge = typeof api;
 
-contextBridge.exposeInMainWorld("garage", api);
+contextBridge.exposeInMainWorld('garage', api);

@@ -4,7 +4,7 @@
  * display system for presentation only — stored/analyzed data stays metric.
  */
 
-export type UnitSystem = "metric" | "imperial";
+export type UnitSystem = 'metric' | 'imperial';
 
 const round1 = (n: number): number => Math.round(n * 10) / 10;
 
@@ -14,21 +14,21 @@ export function convertUnit(
   unit: string | undefined,
   system: UnitSystem
 ): { value: number; unit?: string } {
-  if (system === "metric" || unit === undefined) return { value, unit };
+  if (system === 'metric' || unit === undefined) return { value, unit };
   switch (unit) {
-    case "C":
-      return { value: round1((value * 9) / 5 + 32), unit: "F" };
-    case "km/h":
-      return { value: round1(value * 0.621371), unit: "mph" };
-    case "km":
-      return { value: round1(value * 0.621371), unit: "mi" };
-    case "kPa":
-      return { value: round1(value * 0.1450377), unit: "psi" };
-    case "L/h":
-      return { value: round1(value * 0.2641721), unit: "gal/h" };
-    case "g/s":
+    case 'C':
+      return { value: round1((value * 9) / 5 + 32), unit: 'F' };
+    case 'km/h':
+      return { value: round1(value * 0.621371), unit: 'mph' };
+    case 'km':
+      return { value: round1(value * 0.621371), unit: 'mi' };
+    case 'kPa':
+      return { value: round1(value * 0.1450377), unit: 'psi' };
+    case 'L/h':
+      return { value: round1(value * 0.2641721), unit: 'gal/h' };
+    case 'g/s':
       // 1 g/s = 3600 g/hr = 3.6 kg/hr × 2.20462 lb/kg = 7.93664 lb/hr
-      return { value: round1(value * 7.93664), unit: "lb/hr" };
+      return { value: round1(value * 7.93664), unit: 'lb/hr' };
     default:
       return { value, unit };
   }

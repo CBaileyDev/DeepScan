@@ -6,29 +6,29 @@
  * Exits 0 on success, non-zero on any failure — usable in CI without a display.
  */
 
-const { app, BrowserWindow, ipcMain } = require("electron");
-const { join } = require("node:path");
+const { app, BrowserWindow, ipcMain } = require('electron');
+const { join } = require('node:path');
 
-const root = join(__dirname, "..");
+const root = join(__dirname, '..');
 const failures = [];
 
 // Stub the app-info channel the renderer's About tab calls (the real main.ts
 // registers this; the smoke harness provides its own minimal main).
-ipcMain.handle("app:info", () => ({
-  appVersion: "smoke",
+ipcMain.handle('app:info', () => ({
+  appVersion: 'smoke',
   electron: process.versions.electron,
   chrome: process.versions.chrome,
-  platform: process.platform
+  platform: process.platform,
 }));
 
 // In-memory history store (the real main.ts persists to disk).
 let history = [];
-ipcMain.handle("history:list", () => history);
-ipcMain.handle("history:save", (_e, record) => {
+ipcMain.handle('history:list', () => history);
+ipcMain.handle('history:save', (_e, record) => {
   history.unshift(record);
   return history;
 });
-ipcMain.handle("history:clear", () => {
+ipcMain.handle('history:clear', () => {
   history = [];
 });
 
@@ -38,21 +38,25 @@ app
     const win = new BrowserWindow({
       show: false,
       webPreferences: {
-        preload: join(root, "dist", "main", "preload.cjs"),
+        preload: join(root, 'dist', 'main', 'preload.cjs'),
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: true
-      }
+        sandbox: true,
+      },
     });
 
     const ses = win.webContents.session;
-    ses.setPermissionCheckHandler((_wc, permission) => permission === "serial");
-    ses.setDevicePermissionHandler(details => details.deviceType === "serial");
+    ses.setPermissionCheckHandler((_wc, permission) => permission === 'serial');
+    ses.setDevicePermissionHandler((details) => details.deviceType === 'serial');
 
-    win.webContents.on("render-process-gone", (_e, details) => failures.push("render-process-gone: " + details.reason));
-    win.webContents.on("preload-error", (_e, path, error) => failures.push("preload-error: " + error.message));
+    win.webContents.on('render-process-gone', (_e, details) =>
+      failures.push('render-process-gone: ' + details.reason)
+    );
+    win.webContents.on('preload-error', (_e, path, error) =>
+      failures.push('preload-error: ' + error.message)
+    );
 
-    await win.loadFile(join(root, "dist", "renderer", "index.html"));
+    await win.loadFile(join(root, 'dist', 'renderer', 'index.html'));
 
     const result = await win.webContents.executeJavaScript(`(async () => {
       const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -93,27 +97,29 @@ app
       };
     })()`);
 
-    console.log("SMOKE_RESULT=" + JSON.stringify(result));
+    console.log('SMOKE_RESULT=' + JSON.stringify(result));
 
-    if (!/Demo/.test(result.pill) || !result.pillClass.includes("pill--on")) {
-      failures.push("Demo connect did not reach connected state: " + result.pill);
+    if (!/Demo/.test(result.pill) || !result.pillClass.includes('pill--on')) {
+      failures.push('Demo connect did not reach connected state: ' + result.pill);
     }
-    if (!result.scanHasMisfire || !result.scanHasCat) failures.push("Scan output missing DTC codes");
-    if (!result.scanHasVin) failures.push("Scan output missing VIN");
-    if (!result.scanHasRpm) failures.push("Scan output missing live RPM");
-    if (!result.fdHasRpm) failures.push("Tune advisor produced no result");
-    if (!result.historyHasEntry) failures.push("History did not record the scan");
-    if (Array.isArray(result.errors) && result.errors.length) failures.push("renderer errors: " + result.errors.join("; "));
+    if (!result.scanHasMisfire || !result.scanHasCat)
+      failures.push('Scan output missing DTC codes');
+    if (!result.scanHasVin) failures.push('Scan output missing VIN');
+    if (!result.scanHasRpm) failures.push('Scan output missing live RPM');
+    if (!result.fdHasRpm) failures.push('Tune advisor produced no result');
+    if (!result.historyHasEntry) failures.push('History did not record the scan');
+    if (Array.isArray(result.errors) && result.errors.length)
+      failures.push('renderer errors: ' + result.errors.join('; '));
 
     if (failures.length) {
-      console.error("SMOKE_FAIL\n" + failures.join("\n"));
+      console.error('SMOKE_FAIL\n' + failures.join('\n'));
       app.exit(1);
     } else {
-      console.log("SMOKE_OK");
+      console.log('SMOKE_OK');
       app.exit(0);
     }
   })
-  .catch(err => {
-    console.error("SMOKE_EXCEPTION", err && err.stack ? err.stack : err);
+  .catch((err) => {
+    console.error('SMOKE_EXCEPTION', err && err.stack ? err.stack : err);
     app.exit(2);
   });

@@ -8,11 +8,21 @@
  * nothing to rebuild against Electron's ABI.
  */
 
-import { app, BrowserWindow, ipcMain, Menu, session, shell, type IpcMainEvent, type IpcMainInvokeEvent, type MenuItemConstructorOptions } from "electron";
-import { join } from "node:path";
-import { readFile, writeFile, rename, mkdir } from "node:fs/promises";
-import { IPC, type AppInfo, type HistoryRecord, type SerialPortInfo } from "../shared/ipc.js";
-import { isAllowedExternalUrl, isTrustedFrameUrl } from "./url-allowlist.js";
+import {
+  app,
+  BrowserWindow,
+  ipcMain,
+  Menu,
+  session,
+  shell,
+  type IpcMainEvent,
+  type IpcMainInvokeEvent,
+  type MenuItemConstructorOptions,
+} from 'electron';
+import { join } from 'node:path';
+import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
+import { IPC, type AppInfo, type HistoryRecord, type SerialPortInfo } from '../shared/ipc.js';
+import { isAllowedExternalUrl, isTrustedFrameUrl } from './url-allowlist.js';
 
 /**
  * Content Security Policy applied as a response header (defense in depth beyond
@@ -26,7 +36,7 @@ const CSP =
   "style-src 'self' 'unsafe-inline'; " +
   "img-src 'self' data:; " +
   "font-src 'self'; " +
-  "connect-src https://vpic.nhtsa.dot.gov; " +
+  'connect-src https://vpic.nhtsa.dot.gov; ' +
   "object-src 'none'; " +
   "base-uri 'self'; " +
   "form-action 'none'";
@@ -37,11 +47,11 @@ function isTrustedSender(event: IpcMainEvent | IpcMainInvokeEvent): boolean {
 }
 
 const HISTORY_CAP = 100;
-const historyFile = (): string => join(app.getPath("userData"), "deepscan-history.json");
+const historyFile = (): string => join(app.getPath('userData'), 'deepscan-history.json');
 
 async function readHistory(): Promise<HistoryRecord[]> {
   try {
-    const parsed = JSON.parse(await readFile(historyFile(), "utf8"));
+    const parsed = JSON.parse(await readFile(historyFile(), 'utf8'));
     return Array.isArray(parsed) ? (parsed as HistoryRecord[]) : [];
   } catch {
     // Missing or corrupt file → start fresh.
@@ -51,9 +61,9 @@ async function readHistory(): Promise<HistoryRecord[]> {
 
 async function writeHistory(records: HistoryRecord[]): Promise<void> {
   const file = historyFile();
-  await mkdir(app.getPath("userData"), { recursive: true });
+  await mkdir(app.getPath('userData'), { recursive: true });
   const tmp = `${file}.tmp`;
-  await writeFile(tmp, JSON.stringify(records), "utf8");
+  await writeFile(tmp, JSON.stringify(records), 'utf8');
   await rename(tmp, file); // atomic replace
 }
 
@@ -71,37 +81,37 @@ function hardenDefaultSession(): void {
   const ses = session.defaultSession;
   ses.webRequest.onHeadersReceived((details, callback) => {
     callback({
-      responseHeaders: { ...details.responseHeaders, "Content-Security-Policy": [CSP] }
+      responseHeaders: { ...details.responseHeaders, 'Content-Security-Policy': [CSP] },
     });
   });
-  ses.setPermissionCheckHandler((_wc, permission) => permission === "serial");
+  ses.setPermissionCheckHandler((_wc, permission) => permission === 'serial');
   // Web Serial is granted via the check + device handlers below; every other
   // permission request (notifications, media, geolocation, …) is denied.
   ses.setPermissionRequestHandler((_wc, _permission, done) => done(false));
-  ses.setDevicePermissionHandler(details => details.deviceType === "serial");
+  ses.setDevicePermissionHandler((details) => details.deviceType === 'serial');
 }
 
 // Navigation hardening, registered once for every web contents the app creates.
-app.on("web-contents-created", (_event, contents) => {
+app.on('web-contents-created', (_event, contents) => {
   // Keep the renderer pinned to the bundled app; never let it navigate or be
   // redirected to a remote origin (a classic XSS-to-takeover lever).
   const blockOffApp = (event: Electron.Event, url: string): void => {
     let isLocal = false;
     try {
-      isLocal = new URL(url).protocol === "file:";
+      isLocal = new URL(url).protocol === 'file:';
     } catch {
       isLocal = false;
     }
     if (!isLocal) event.preventDefault();
   };
-  contents.on("will-navigate", blockOffApp);
-  contents.on("will-redirect", blockOffApp);
+  contents.on('will-navigate', blockOffApp);
+  contents.on('will-redirect', blockOffApp);
 
   // External links (e.g. DTC look-ups) open in the OS browser — and only if they
   // pass the strict allowlist. The window itself never opens a child window.
   contents.setWindowOpenHandler(({ url }) => {
     if (isAllowedExternalUrl(url)) void shell.openExternal(url);
-    return { action: "deny" };
+    return { action: 'deny' };
   });
 });
 
@@ -111,10 +121,10 @@ function createWindow(): BrowserWindow {
     height: 800,
     minWidth: 900,
     minHeight: 640,
-    backgroundColor: "#0d1117",
-    title: "DeepScan",
+    backgroundColor: '#0d1117',
+    title: 'DeepScan',
     webPreferences: {
-      preload: appPath("dist", "main", "preload.cjs"),
+      preload: appPath('dist', 'main', 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -122,49 +132,49 @@ function createWindow(): BrowserWindow {
       // change can't silently weaken the renderer's isolation.
       webSecurity: true,
       allowRunningInsecureContent: false,
-      experimentalFeatures: false
-    }
+      experimentalFeatures: false,
+    },
   });
 
   const ses = win.webContents.session;
 
   // When the renderer calls navigator.serial.requestPort(), Electron asks us to
   // choose. Forward the candidates to the renderer's picker and wait.
-  ses.on("select-serial-port", (event, portList, _webContents, callback) => {
+  ses.on('select-serial-port', (event, portList, _webContents, callback) => {
     event.preventDefault();
     // Release any earlier pending request that was never resolved (e.g. the user
     // clicked Connect twice) so its requestPort() promise doesn't hang forever.
-    if (pendingPortCallback) pendingPortCallback("");
+    if (pendingPortCallback) pendingPortCallback('');
     pendingPortCallback = callback;
-    const ports: SerialPortInfo[] = portList.map(p => ({
+    const ports: SerialPortInfo[] = portList.map((p) => ({
       portId: p.portId,
       portName: p.portName,
       displayName: p.displayName,
       vendorId: p.vendorId,
-      productId: p.productId
+      productId: p.productId,
     }));
     win.webContents.send(IPC.SerialPorts, ports);
   });
 
-  void win.loadFile(appPath("dist", "renderer", "index.html"));
+  void win.loadFile(appPath('dist', 'renderer', 'index.html'));
   return win;
 }
 
 ipcMain.on(IPC.SerialChoose, (event: IpcMainEvent, portId: string) => {
   if (!isTrustedSender(event)) return;
   if (pendingPortCallback) {
-    pendingPortCallback(typeof portId === "string" ? portId : "");
+    pendingPortCallback(typeof portId === 'string' ? portId : '');
     pendingPortCallback = null;
   }
 });
 
 ipcMain.handle(IPC.HistoryList, (event): Promise<HistoryRecord[]> => {
-  if (!isTrustedSender(event)) throw new Error("Untrusted IPC sender");
+  if (!isTrustedSender(event)) throw new Error('Untrusted IPC sender');
   return readHistory();
 });
 
 ipcMain.handle(IPC.HistorySave, async (event, record: HistoryRecord): Promise<HistoryRecord[]> => {
-  if (!isTrustedSender(event)) throw new Error("Untrusted IPC sender");
+  if (!isTrustedSender(event)) throw new Error('Untrusted IPC sender');
   const records = await readHistory();
   records.unshift(record); // newest first
   const capped = records.slice(0, HISTORY_CAP);
@@ -173,43 +183,41 @@ ipcMain.handle(IPC.HistorySave, async (event, record: HistoryRecord): Promise<Hi
 });
 
 ipcMain.handle(IPC.HistoryClear, async (event): Promise<void> => {
-  if (!isTrustedSender(event)) throw new Error("Untrusted IPC sender");
+  if (!isTrustedSender(event)) throw new Error('Untrusted IPC sender');
   await writeHistory([]);
 });
 
 ipcMain.handle(IPC.AppInfo, (event): AppInfo => {
-  if (!isTrustedSender(event)) throw new Error("Untrusted IPC sender");
+  if (!isTrustedSender(event)) throw new Error('Untrusted IPC sender');
   return {
     appVersion: app.getVersion(),
-    electron: process.versions.electron ?? "",
-    chrome: process.versions.chrome ?? "",
-    platform: process.platform
+    electron: process.versions.electron ?? '',
+    chrome: process.versions.chrome ?? '',
+    platform: process.platform,
   };
 });
 
 /** A standard role-based menu so Cmd+Q/Copy/Paste/Reload behave natively. */
 function buildMenu(): Menu {
-  const isMac = process.platform === "darwin";
+  const isMac = process.platform === 'darwin';
   const template: MenuItemConstructorOptions[] = [
-    ...(isMac
-      ? ([{ role: "appMenu" }] as MenuItemConstructorOptions[])
-      : []),
-    { role: "fileMenu" },
-    { role: "editMenu" },
+    ...(isMac ? ([{ role: 'appMenu' }] as MenuItemConstructorOptions[]) : []),
+    { role: 'fileMenu' },
+    { role: 'editMenu' },
     {
-      label: "View",
+      label: 'View',
       submenu: [
-        { role: "reload" },
-        { role: "toggleDevTools" },
-        { type: "separator" },
-        { role: "resetZoom" },
-        { role: "zoomIn" },
-        { role: "zoomOut" },
-        { type: "separator" },
-        { role: "togglefullscreen" }
-      ]
+        { role: 'reload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+      ],
     },
-    { role: "windowMenu" }
+    { role: 'windowMenu' },
   ];
   return Menu.buildFromTemplate(template);
 }
@@ -218,11 +226,11 @@ void app.whenReady().then(() => {
   hardenDefaultSession();
   Menu.setApplicationMenu(buildMenu());
   createWindow();
-  app.on("activate", () => {
+  app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
 });
 
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") app.quit();
+app.on('window-all-closed', () => {
+  if (process.platform !== 'darwin') app.quit();
 });

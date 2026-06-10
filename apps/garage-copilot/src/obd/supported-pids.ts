@@ -8,10 +8,10 @@
  * flag. Pure; no I/O.
  */
 
-const toHex = (n: number): string => n.toString(16).toUpperCase().padStart(2, "0");
+const toHex = (n: number): string => n.toString(16).toUpperCase().padStart(2, '0');
 
 /** The range-marker PIDs that signal "next bank supported" (not real sensors). */
-export const SUPPORT_RANGE_PIDS = ["20", "40", "60", "80", "A0", "C0", "E0"];
+export const SUPPORT_RANGE_PIDS = ['20', '40', '60', '80', 'A0', 'C0', 'E0'];
 
 /**
  * Decode one supported-PIDs bitmask. `basePid` is the PID queried (0x00, 0x20,

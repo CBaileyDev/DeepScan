@@ -7,8 +7,8 @@
  * MCP server's read-only v1 boundary.
  */
 
-import type { DecodedPid } from "./pid-formulas.js";
-import type { MonitorStatus } from "./dtc-decode.js";
+import type { DecodedPid } from './pid-formulas.js';
+import type { MonitorStatus } from './dtc-decode.js';
 
 /** Adapter/protocol identity reported after initialization. */
 export type ObdIdentity = {

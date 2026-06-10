@@ -55,7 +55,7 @@ export type PlaybookOptions = {
 
 /** Build the full system prompt, optionally anchored to a specific vehicle. */
 export function buildSystemPrompt(options: PlaybookOptions = {}): string {
-  if (options.vehicleLabel && options.vehicleLabel.trim() !== "") {
+  if (options.vehicleLabel && options.vehicleLabel.trim() !== '') {
     return `${DIAGNOSTIC_PLAYBOOK}\n\nThe vehicle under inspection is: ${options.vehicleLabel.trim()}.`;
   }
   return DIAGNOSTIC_PLAYBOOK;

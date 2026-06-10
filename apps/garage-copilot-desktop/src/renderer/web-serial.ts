@@ -10,7 +10,7 @@
  * transport can be unit-tested with in-memory Web Streams.
  */
 
-import type { ObdTransport } from "./core.js";
+import type { ObdTransport } from './core.js';
 
 export interface SerialPortLike {
   open(options: { baudRate: number }): Promise<void>;
@@ -43,9 +43,12 @@ export class WebSerialTransport implements ObdTransport {
   private closed = false;
   private readonly onError?: (error: Error) => void;
 
-  constructor(private readonly port: SerialPortLike, options: WebSerialOptions = {}) {
+  constructor(
+    private readonly port: SerialPortLike,
+    options: WebSerialOptions = {}
+  ) {
     this.baudRate = options.baudRate ?? 38400;
-    this.description = options.description ?? "Web Serial OBD-II adapter";
+    this.description = options.description ?? 'Web Serial OBD-II adapter';
     this.onError = options.onError;
   }
 
@@ -54,7 +57,7 @@ export class WebSerialTransport implements ObdTransport {
     try {
       await this.port.open({ baudRate: this.baudRate });
       if (!this.port.writable || !this.port.readable) {
-        throw new Error("Serial port did not expose readable/writable streams.");
+        throw new Error('Serial port did not expose readable/writable streams.');
       }
       this.writer = this.port.writable.getWriter();
       this.reader = this.port.readable.getReader();
@@ -104,7 +107,7 @@ export class WebSerialTransport implements ObdTransport {
   }
 
   async write(data: string): Promise<void> {
-    if (!this.writer) throw new Error("Transport not started — call start() first.");
+    if (!this.writer) throw new Error('Transport not started — call start() first.');
     await this.writer.write(this.encoder.encode(data));
   }
 

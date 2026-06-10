@@ -3,22 +3,23 @@
  * can be unit-tested in Node.
  */
 
-import type { TimedSample } from "./core.js";
+import type { TimedSample } from './core.js';
 
 /** Build a CSV from recorded live samples. */
 export function toCsv(samples: TimedSample[]): string {
-  const header = "time_iso,pid,label,value,unit";
+  const header = 'time_iso,pid,label,value,unit';
   const rows = samples.map(
-    s => `${new Date(s.t).toISOString()},${s.pid},"${s.label.replace(/"/g, '""')}",${s.value},${s.unit ?? ""}`
+    (s) =>
+      `${new Date(s.t).toISOString()},${s.pid},"${s.label.replace(/"/g, '""')}",${s.value},${s.unit ?? ''}`
   );
-  return [header, ...rows].join("\n");
+  return [header, ...rows].join('\n');
 }
 
 /** CSS class for a report line — colour readiness/MIL/warnings consistently. */
 export function lineSeverityClass(line: string): string {
-  if (line.startsWith("✗") || /not-ready|MIL.*ON|: ON\b/.test(line)) return "row row--warn";
-  if (line.startsWith("✓")) return "row row--ok";
-  return "row";
+  if (line.startsWith('✗') || /not-ready|MIL.*ON|: ON\b/.test(line)) return 'row row--warn';
+  if (line.startsWith('✓')) return 'row row--ok';
+  return 'row';
 }
 
 /**

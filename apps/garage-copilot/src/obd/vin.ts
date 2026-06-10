@@ -9,7 +9,7 @@
  * non-printable and fall away naturally). Pure; no I/O.
  */
 
-import { parseHexBytes } from "./dtc-decode.js";
+import { parseHexBytes } from './dtc-decode.js';
 
 /**
  * Decode the VIN from a Mode 09 PID 02 response (one or more lines). Returns the
@@ -20,7 +20,7 @@ export function decodeVinResponse(lines: string[]): string | undefined {
   const bytes: number[] = [];
   for (const raw of lines) {
     // Drop an ISO-TP frame index like "0:" / "1:" that ELM327 prefixes.
-    const cleaned = raw.replace(/^[0-9A-Fa-f]+:\s*/, "");
+    const cleaned = raw.replace(/^[0-9A-Fa-f]+:\s*/, '');
     bytes.push(...parseHexBytes(cleaned));
   }
 
@@ -28,10 +28,10 @@ export function decodeVinResponse(lines: string[]): string | undefined {
     if (bytes[i] === 0x49 && bytes[i + 1] === 0x02) {
       const vin = bytes
         .slice(i + 2)
-        .filter(b => b >= 0x20 && b <= 0x7e) // printable ASCII only (drops count + 0x00 pad)
-        .map(b => String.fromCharCode(b))
-        .join("")
-        .replace(/\s+/g, "")
+        .filter((b) => b >= 0x20 && b <= 0x7e) // printable ASCII only (drops count + 0x00 pad)
+        .map((b) => String.fromCharCode(b))
+        .join('')
+        .replace(/\s+/g, '')
         .toUpperCase();
       return vin.length >= 11 ? vin : undefined;
     }

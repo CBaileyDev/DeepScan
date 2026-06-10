@@ -1,4 +1,4 @@
-import type { GarageBridge } from "../main/preload.js";
+import type { GarageBridge } from '../main/preload.js';
 
 declare global {
   interface Window {

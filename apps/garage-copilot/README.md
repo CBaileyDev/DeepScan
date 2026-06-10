@@ -7,29 +7,29 @@ core capabilities: **diagnose**, **monitor**, and **tune-advise**.
 It runs fully offline (no hardware needed) via a built-in replay adapter, so
 you can try the whole flow right now without any hardware.
 
-> **Read-only by design.** DeepScan only issues OBD *read* services. It
+> **Read-only by design.** DeepScan only issues OBD _read_ services. It
 > never clears codes, writes to an ECU, or runs active tests. The "tune" feature
 > is a planning **advisor** (math that validates a proposed change) — it does not
 > flash anything. See [Safety & legal](#safety--legal).
 
 ## What's inside
 
-| Layer | Module | What it is |
-| --- | --- | --- |
-| **OBD bridge** | `src/obd/elm327.ts` | A real ELM327 AT-command + OBD protocol driver, written against a transport interface so it's 100% testable without hardware. |
-| | `src/obd/pid-formulas.ts` | Standard SAE J1979 Mode-01 PID decode formulas (RPM, coolant, fuel trims, …). |
-| | `src/obd/dtc-decode.ts` | DTC byte → code decode (P0301, …) and Mode-01 PID-01 monitor/readiness decode. |
-| | `src/obd/vin.ts` | Decode the VIN from a Mode-09 PID-02 response (tolerant of multi-frame ISO-TP). |
-| | `src/obd/serial-transport.ts` | Live USB/Bluetooth transport via `serialport` (lazy-loaded; install it only when you want real hardware). |
-| | `src/obd/replay-transport.ts` | Offline transport that replays a canned vehicle — powers `--demo` and the tests. |
-| | `src/obd/simulator.ts` | A `SimulatedObdReader` with time-varying idle data (RPM wander, coolant warm-up) for demos and dev. |
-| **Diagnose** | `src/diagnose/session.ts` | One read-only pass → a `DiagnosticSnapshot` (MIL, DTCs, readiness, live data). |
-| | `src/diagnose/report.ts` | Snapshot → a structured, caveated report with structural DTC decode. |
-| **Monitor** | `src/monitor/recorder.ts` | Sample PIDs over several rounds into a time series (injected clock — deterministic). |
-| | `src/monitor/trends.ts` | Per-parameter stats + conservative flags (fuel-trim drift, overheat, weak charge). |
-| **Tune-advise** | `src/tune/advisor.ts` | Read-side validation math: final-drive RPM shift, injector sizing, electrical load budget. |
-| **Agent wiring** | `src/agent/mcp-config.ts` | Generates the combined MCP config that wires all repo servers into Claude. |
-| | `src/agent/playbook.ts` | The diagnostic playbook (system prompt) for Claude to chain the servers. |
+| Layer            | Module                        | What it is                                                                                                                    |
+| ---------------- | ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **OBD bridge**   | `src/obd/elm327.ts`           | A real ELM327 AT-command + OBD protocol driver, written against a transport interface so it's 100% testable without hardware. |
+|                  | `src/obd/pid-formulas.ts`     | Standard SAE J1979 Mode-01 PID decode formulas (RPM, coolant, fuel trims, …).                                                 |
+|                  | `src/obd/dtc-decode.ts`       | DTC byte → code decode (P0301, …) and Mode-01 PID-01 monitor/readiness decode.                                                |
+|                  | `src/obd/vin.ts`              | Decode the VIN from a Mode-09 PID-02 response (tolerant of multi-frame ISO-TP).                                               |
+|                  | `src/obd/serial-transport.ts` | Live USB/Bluetooth transport via `serialport` (lazy-loaded; install it only when you want real hardware).                     |
+|                  | `src/obd/replay-transport.ts` | Offline transport that replays a canned vehicle — powers `--demo` and the tests.                                              |
+|                  | `src/obd/simulator.ts`        | A `SimulatedObdReader` with time-varying idle data (RPM wander, coolant warm-up) for demos and dev.                           |
+| **Diagnose**     | `src/diagnose/session.ts`     | One read-only pass → a `DiagnosticSnapshot` (MIL, DTCs, readiness, live data).                                                |
+|                  | `src/diagnose/report.ts`      | Snapshot → a structured, caveated report with structural DTC decode.                                                          |
+| **Monitor**      | `src/monitor/recorder.ts`     | Sample PIDs over several rounds into a time series (injected clock — deterministic).                                          |
+|                  | `src/monitor/trends.ts`       | Per-parameter stats + conservative flags (fuel-trim drift, overheat, weak charge).                                            |
+| **Tune-advise**  | `src/tune/advisor.ts`         | Read-side validation math: final-drive RPM shift, injector sizing, electrical load budget.                                    |
+| **Agent wiring** | `src/agent/mcp-config.ts`     | Generates the combined MCP config that wires all repo servers into Claude.                                                    |
+|                  | `src/agent/playbook.ts`       | The diagnostic playbook (system prompt) for Claude to chain the servers.                                                      |
 
 ## Quick start
 
@@ -88,7 +88,7 @@ and feed snapshots to the model directly.
 ## How the offline demo stays honest
 
 `--demo` doesn't fake the output — it replays canned **ELM327 byte strings**
-(`src/obd/recordings.ts`) through the *real* driver and decoders. The hex is
+(`src/obd/recordings.ts`) through the _real_ driver and decoders. The hex is
 hand-built to decode to the stated values (e.g. `41 0C 0C B0` → 812 rpm), so the
 demo exercises the same code path a real dongle would.
 
@@ -98,7 +98,7 @@ demo exercises the same code path a real dongle would.
   the driver or its interface.
 - **Evidence, not diagnosis.** Reports and trend flags are conservative and
   caveated; manufacturer-specific DTC meanings are never invented.
-- **"Tune" = advice, not flashing.** The advisor validates the *consequence* of a
+- **"Tune" = advice, not flashing.** The advisor validates the _consequence_ of a
   change (RPM shift, injector headroom, alternator load). Actually flashing an
   ECU is done with a proper licensed tool — and modifying emissions-related
   calibration on a road vehicle is regulated (e.g. the U.S. Clean Air Act). Keep

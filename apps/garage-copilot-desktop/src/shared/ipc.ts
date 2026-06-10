@@ -17,17 +17,17 @@ export type SerialPortInfo = {
 
 export const IPC = {
   /** main -> renderer: here is the list of ports to choose from. */
-  SerialPorts: "serial:ports",
+  SerialPorts: 'serial:ports',
   /** renderer -> main: the user picked this portId ("" to cancel). */
-  SerialChoose: "serial:choose",
+  SerialChoose: 'serial:choose',
   /** renderer -> main: get app/runtime info. */
-  AppInfo: "app:info",
+  AppInfo: 'app:info',
   /** renderer -> main: list saved scans (newest first). */
-  HistoryList: "history:list",
+  HistoryList: 'history:list',
   /** renderer -> main: persist a scan record. */
-  HistorySave: "history:save",
+  HistorySave: 'history:save',
   /** renderer -> main: clear all saved scans. */
-  HistoryClear: "history:clear"
+  HistoryClear: 'history:clear',
 } as const;
 
 export type AppInfo = {

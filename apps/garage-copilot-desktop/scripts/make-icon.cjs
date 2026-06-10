@@ -4,15 +4,15 @@
  * tooling is required. Run: xvfb-run -a electron scripts/make-icon.cjs
  */
 
-const { app, BrowserWindow } = require("electron");
-const { join } = require("node:path");
-const { mkdirSync, writeFileSync } = require("node:fs");
+const { app, BrowserWindow } = require('electron');
+const { join } = require('node:path');
+const { mkdirSync, writeFileSync } = require('node:fs');
 
 app
   .whenReady()
   .then(async () => {
     const win = new BrowserWindow({ show: false, width: 256, height: 256 });
-    await win.loadURL("data:text/html,<body></body>");
+    await win.loadURL('data:text/html,<body></body>');
 
     const dataUrl = await win.webContents.executeJavaScript(`(() => {
       const S = 1024;
@@ -61,13 +61,13 @@ app
       return c.toDataURL('image/png');
     })()`);
 
-    const png = Buffer.from(dataUrl.split(",")[1], "base64");
-    mkdirSync(join(__dirname, "..", "build"), { recursive: true });
-    writeFileSync(join(__dirname, "..", "build", "icon.png"), png);
-    console.log("wrote build/icon.png", png.length, "bytes");
+    const png = Buffer.from(dataUrl.split(',')[1], 'base64');
+    mkdirSync(join(__dirname, '..', 'build'), { recursive: true });
+    writeFileSync(join(__dirname, '..', 'build', 'icon.png'), png);
+    console.log('wrote build/icon.png', png.length, 'bytes');
     app.exit(0);
   })
-  .catch(err => {
-    console.error("ICON_EXCEPTION", err && err.stack ? err.stack : err);
+  .catch((err) => {
+    console.error('ICON_EXCEPTION', err && err.stack ? err.stack : err);
     app.exit(2);
   });

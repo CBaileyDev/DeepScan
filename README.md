@@ -9,23 +9,31 @@ Professional read-only automotive diagnostics: a cross-platform desktop app and 
 
 ## Quick Start
 
+### One-command workspace setup (recommended)
+
+```bash
+npm install        # installs both apps via npm workspaces
+npm run build      # builds both apps
+npm test           # runs all tests (engine + desktop)
+npm run typecheck  # TypeScript strict mode
+npm run lint       # ESLint check
+npm run format     # Auto-format code (prettier)
+```
+
 ### Desktop App (GUI)
 
 ```bash
-npm install
 npm start          # builds the engine + app, then launches the GUI
 ```
 
 Click **Demo mode** to explore with a simulated vehicle (no hardware), or **Connect OBD-II** to plug in a real ELM327 adapter.
 
-### CLI
+### CLI (standalone)
 
 ```bash
 cd apps/garage-copilot
-npm install
-npm run build
-node dist/cli.js diagnose --demo           # offline demo
-node dist/cli.js diagnose --port /dev/ttyUSB0  # real hardware
+npm run dev -- diagnose --demo           # offline demo (no build needed)
+npm run build && node dist/cli.js diagnose --vehicle "2014 Honda Accord"
 ```
 
 ## Repository Structure
@@ -45,6 +53,7 @@ DeepScan/
 The core diagnostic library: ELM327 driver, SAE J1979 OBD-II decoder, trend analyzer, and tune advisor. Runs in Node.js and the browser (via transpilation). All the tested OBD logic lives here.
 
 **Quick start:**
+
 ```bash
 cd apps/garage-copilot
 npm install && npm run build
@@ -57,6 +66,7 @@ node dist/cli.js diagnose --vehicle "2014 Subaru Forester"
 Electron GUI for Windows, macOS, and Linux. Wraps the engine with a Web Serial adapter for real hardware and a modern responsive UI (gauges, live monitor, history timeline, VIN lookup, tune forms).
 
 **Quick start:**
+
 ```bash
 cd apps/garage-copilot-desktop
 npm install && npm start   # builds engine + app, launches GUI
@@ -65,27 +75,39 @@ npm run dist              # package for your OS (macOS .dmg/.zip, Windows .exe/.
 
 ## Development
 
-### Install & Build
+### Workspace Setup
+
+This is an npm workspace with two apps:
+
+- `apps/garage-copilot` — CLI engine & library
+- `apps/garage-copilot-desktop` — Electron desktop app
+
+Run commands at the **repo root**; npm handles routing to workspaces:
 
 ```bash
-npm install               # installs all workspaces (when configured)
-npm run build             # builds both apps
-npm test                  # runs all tests
-npm run typecheck         # TypeScript strict mode
+npm install               # Install dependencies for both apps
+npm run build             # Build both apps (tsc + esbuild)
+npm run typecheck         # TypeScript strict mode check
+npm test                  # Run all unit tests
+npm run lint              # ESLint + format check
+npm run format            # Auto-format with Prettier
+npm run format:check      # Check formatting without changes
 ```
 
 ### Development Mode
 
-**Engine (CLI):**
+**Engine (CLI with live rebuild):**
+
 ```bash
 cd apps/garage-copilot
-npm run dev -- diagnose --demo
+npm run dev -- diagnose --demo --vehicle "2014 Honda Accord"
 ```
 
-**Desktop app:**
+**Desktop app (with HMR):**
+
 ```bash
 cd apps/garage-copilot-desktop
-npm start
+npm start                 # Builds engine, then launches Electron dev server
 ```
 
 ## Architecture
@@ -109,7 +131,7 @@ Both are written in TypeScript with strict mode, fully tested, and hardened agai
 
 - **Read-only by design**: No code clearing, ECU writing, or active tests anywhere in the codebase.
 - **Evidence, not diagnosis**: Reports are caveated; no manufacturer-specific DTC meanings are invented.
-- **Tune = advisory math only**: The advisor validates the *consequence* of a proposed change; it does not flash anything.
+- **Tune = advisory math only**: The advisor validates the _consequence_ of a proposed change; it does not flash anything.
 - **Clone adapters vary**: ELM327 clones are unreliable; STN-based dongles (OBDLink SX/MX+) are recommended.
 
 Modifying emissions-related calibration on a road vehicle is regulated (U.S. Clean Air Act, etc.). Keep performance changes to off-road and track use only.

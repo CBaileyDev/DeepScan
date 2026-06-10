@@ -3,45 +3,45 @@
 // renderer bundles the DeepScan engine straight from ../garage-copilot's
 // built dist, so all the tested OBD logic is reused as-is.
 
-import { build } from "esbuild";
-import { copyFileSync, mkdirSync } from "node:fs";
+import { build } from 'esbuild';
+import { copyFileSync, mkdirSync } from 'node:fs';
 
-const common = { bundle: true, logLevel: "info", sourcemap: true };
+const common = { bundle: true, logLevel: 'info', sourcemap: true };
 
 await build({
   ...common,
-  entryPoints: ["src/main/main.ts"],
-  outfile: "dist/main/main.cjs",
-  platform: "node",
-  format: "cjs",
-  target: "node20",
-  external: ["electron"]
+  entryPoints: ['src/main/main.ts'],
+  outfile: 'dist/main/main.cjs',
+  platform: 'node',
+  format: 'cjs',
+  target: 'node20',
+  external: ['electron'],
 });
 
 await build({
   ...common,
-  entryPoints: ["src/main/preload.ts"],
-  outfile: "dist/main/preload.cjs",
-  platform: "node",
-  format: "cjs",
-  target: "node20",
-  external: ["electron"]
+  entryPoints: ['src/main/preload.ts'],
+  outfile: 'dist/main/preload.cjs',
+  platform: 'node',
+  format: 'cjs',
+  target: 'node20',
+  external: ['electron'],
 });
 
 await build({
   ...common,
-  entryPoints: ["src/renderer/app.ts"],
-  outfile: "dist/renderer/app.js",
-  platform: "browser",
-  format: "esm",
-  target: "es2022",
+  entryPoints: ['src/renderer/app.ts'],
+  outfile: 'dist/renderer/app.js',
+  platform: 'browser',
+  format: 'esm',
+  target: 'es2022',
   // The engine barrel re-exports a Node-only serial transport guarded by a
   // runtime dynamic import; it is never executed in the browser renderer.
-  logOverride: { "indirect-dynamic-import": "silent" }
+  logOverride: { 'indirect-dynamic-import': 'silent' },
 });
 
-mkdirSync("dist/renderer", { recursive: true });
-copyFileSync("src/renderer/index.html", "dist/renderer/index.html");
-copyFileSync("src/renderer/styles.css", "dist/renderer/styles.css");
+mkdirSync('dist/renderer', { recursive: true });
+copyFileSync('src/renderer/index.html', 'dist/renderer/index.html');
+copyFileSync('src/renderer/styles.css', 'dist/renderer/styles.css');
 
-console.log("deepscan-desktop: build complete");
+console.log('deepscan-desktop: build complete');

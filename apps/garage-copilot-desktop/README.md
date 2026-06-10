@@ -69,11 +69,11 @@ port picker — there's no native serial module to compile, so nothing to rebuil
 `npm run dist` packages the app for **whichever OS you run it on** (output lands
 in `release/`):
 
-| Run on… | You get |
-|---------|---------|
-| macOS   | `.dmg` + `.zip` |
+| Run on… | You get                        |
+| ------- | ------------------------------ |
+| macOS   | `.dmg` + `.zip`                |
 | Windows | NSIS installer `.exe` + `.zip` |
-| Linux   | `.AppImage` + `.deb` |
+| Linux   | `.AppImage` + `.deb`           |
 
 ```bash
 npm run dist
@@ -81,7 +81,7 @@ npm run dist
 
 Electron apps can't be cross-built (you can't make a Mac `.dmg` on Windows, etc.),
 so each platform is built on its own OS. To build **all three at once**, run the
-**desktop-release** GitHub workflow (Actions tab → *Run workflow*, or push a `v*`
+**desktop-release** GitHub workflow (Actions tab → _Run workflow_, or push a `v*`
 tag); it builds on native macOS/Windows/Linux runners and uploads each platform's
 installers as artifacts.
 

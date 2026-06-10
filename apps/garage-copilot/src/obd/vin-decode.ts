@@ -11,10 +11,39 @@
 
 /** ISO 3779 / NHTSA transliteration. I, O, Q are intentionally absent. */
 const TRANSLITERATION: Readonly<Record<string, number>> = {
-  A: 1, B: 2, C: 3, D: 4, E: 5, F: 6, G: 7, H: 8,
-  J: 1, K: 2, L: 3, M: 4, N: 5, P: 7, R: 9,
-  S: 2, T: 3, U: 4, V: 5, W: 6, X: 7, Y: 8, Z: 9,
-  "0": 0, "1": 1, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9
+  A: 1,
+  B: 2,
+  C: 3,
+  D: 4,
+  E: 5,
+  F: 6,
+  G: 7,
+  H: 8,
+  J: 1,
+  K: 2,
+  L: 3,
+  M: 4,
+  N: 5,
+  P: 7,
+  R: 9,
+  S: 2,
+  T: 3,
+  U: 4,
+  V: 5,
+  W: 6,
+  X: 7,
+  Y: 8,
+  Z: 9,
+  '0': 0,
+  '1': 1,
+  '2': 2,
+  '3': 3,
+  '4': 4,
+  '5': 5,
+  '6': 6,
+  '7': 7,
+  '8': 8,
+  '9': 9,
 };
 
 /** Positional weights, index 0..16. Position 9 (index 8) is the check digit → weight 0. */
@@ -63,28 +92,36 @@ export function checkVinFormat(vin: string): VinFormat {
     issues.push(`Length is ${normalized.length}; a VIN must be exactly 17 characters.`);
   }
   if (illegal.size > 0) {
-    const hasIOQ = [...illegal].some(c => "IOQ".includes(c));
+    const hasIOQ = [...illegal].some((c) => 'IOQ'.includes(c));
     issues.push(
-      `Illegal character(s): ${[...illegal].join(", ")}.` +
-        (hasIOQ ? " VINs never use I, O, or Q (to avoid confusion with 1/0)." : "")
+      `Illegal character(s): ${[...illegal].join(', ')}.` +
+        (hasIOQ ? ' VINs never use I, O, or Q (to avoid confusion with 1/0).' : '')
     );
   }
 
-  return { ok: normalized.length === 17 && illegal.size === 0, length: normalized.length, illegalChars: [...illegal], issues };
+  return {
+    ok: normalized.length === 17 && illegal.size === 0,
+    length: normalized.length,
+    illegalChars: [...illegal],
+    issues,
+  };
 }
 
 /** North-American check digit (char "0"-"9" or "X"). Throws unless 17 legal chars. */
 export function computeCheckDigit(vin: string): string {
   const normalized = normalizeVin(vin);
-  if (normalized.length !== 17) throw new Error("computeCheckDigit requires a 17-character VIN");
+  if (normalized.length !== 17) throw new Error('computeCheckDigit requires a 17-character VIN');
   let sum = 0;
   for (let i = 0; i < 17; i++) {
     const value = TRANSLITERATION[normalized[i]];
-    if (value === undefined) throw new Error(`Illegal VIN character ${JSON.stringify(normalized[i])} at position ${i + 1}`);
+    if (value === undefined)
+      throw new Error(
+        `Illegal VIN character ${JSON.stringify(normalized[i])} at position ${i + 1}`
+      );
     sum += value * WEIGHTS[i];
   }
   const remainder = sum % 11;
-  return remainder === 10 ? "X" : String(remainder);
+  return remainder === 10 ? 'X' : String(remainder);
 }
 
 /** Full validation: universal format + NA check digit, reported separately. */
@@ -94,7 +131,13 @@ export function validateVin(vin: string): VinValidation {
 
   let checkDigit: VinCheckDigit;
   if (!format.ok) {
-    checkDigit = { evaluated: false, expected: null, found: null, matches: null, note: "Check digit not evaluated — fix the format first." };
+    checkDigit = {
+      evaluated: false,
+      expected: null,
+      found: null,
+      matches: null,
+      note: 'Check digit not evaluated — fix the format first.',
+    };
   } else {
     const expected = computeCheckDigit(normalized);
     const found = normalized[8];
@@ -105,21 +148,21 @@ export function validateVin(vin: string): VinValidation {
       found,
       matches,
       note: matches
-        ? "Position 9 matches the North American (FMVSS/ISO 3779) check digit."
-        : "Position 9 does NOT match the North American check digit — either a transcription error, or a " +
-          "non-North-American-market VIN (many EU/JP VINs do not use the scheme)."
+        ? 'Position 9 matches the North American (FMVSS/ISO 3779) check digit.'
+        : 'Position 9 does NOT match the North American check digit — either a transcription error, or a ' +
+          'non-North-American-market VIN (many EU/JP VINs do not use the scheme).',
     };
   }
 
   let assessment: string;
   if (!format.ok) {
-    assessment = `Invalid format — ${format.issues.join(" ")} This is a transcription error; re-check the VIN.`;
+    assessment = `Invalid format — ${format.issues.join(' ')} This is a transcription error; re-check the VIN.`;
   } else if (checkDigit.matches) {
-    assessment = "Format is valid and the North American check digit matches.";
+    assessment = 'Format is valid and the North American check digit matches.';
   } else {
     assessment =
-      "Format is valid but the North American check digit does not match. Likely a typo — unless this is a " +
-      "non-NA-market (e.g. European/Japanese) VIN, which may legitimately not use the check digit.";
+      'Format is valid but the North American check digit does not match. Likely a typo — unless this is a ' +
+      'non-NA-market (e.g. European/Japanese) VIN, which may legitimately not use the check digit.';
   }
 
   return { input: vin, normalized, format, checkDigit, assessment };
@@ -128,7 +171,7 @@ export function validateVin(vin: string): VinValidation {
 // ---- Structural decode (offline) -------------------------------------------
 
 /** Model-year codes for positions, 1980→2009 in order (I/O/Q/U/Z/0 excluded). */
-const MODEL_YEAR_CODES = "ABCDEFGHJKLMNPRSTVWXY123456789";
+const MODEL_YEAR_CODES = 'ABCDEFGHJKLMNPRSTVWXY123456789';
 
 /**
  * Model year from position 10, disambiguated by position 7: for light vehicles
@@ -146,33 +189,33 @@ export function decodeModelYear(vin: string): number | undefined {
 
 /** Country/region of origin from the first WMI character. Common assignments. */
 export function decodeOrigin(firstChar: string): { country?: string; region?: string } {
-  const c = (firstChar ?? "").toUpperCase();
+  const c = (firstChar ?? '').toUpperCase();
   const map: Record<string, [string, string]> = {
-    "1": ["United States", "North America"],
-    "4": ["United States", "North America"],
-    "5": ["United States", "North America"],
-    "2": ["Canada", "North America"],
-    "3": ["Mexico", "North America"],
-    "6": ["Australia", "Oceania"],
-    "7": ["New Zealand", "Oceania"],
-    "8": ["Argentina / South America", "South America"],
-    "9": ["Brazil / South America", "South America"],
-    J: ["Japan", "Asia"],
-    K: ["South Korea", "Asia"],
-    L: ["China", "Asia"],
-    M: ["India / Asia", "Asia"],
-    N: ["Turkey / Asia", "Asia"],
-    P: ["Asia", "Asia"],
-    R: ["Taiwan / Asia", "Asia"],
-    S: ["United Kingdom", "Europe"],
-    T: ["Europe (DE/CZ/HU)", "Europe"],
-    V: ["Europe (FR/ES/AT)", "Europe"],
-    W: ["Germany", "Europe"],
-    X: ["Russia / Europe", "Europe"],
-    Y: ["Europe (SE/FI/BY)", "Europe"],
-    Z: ["Italy", "Europe"]
+    '1': ['United States', 'North America'],
+    '4': ['United States', 'North America'],
+    '5': ['United States', 'North America'],
+    '2': ['Canada', 'North America'],
+    '3': ['Mexico', 'North America'],
+    '6': ['Australia', 'Oceania'],
+    '7': ['New Zealand', 'Oceania'],
+    '8': ['Argentina / South America', 'South America'],
+    '9': ['Brazil / South America', 'South America'],
+    J: ['Japan', 'Asia'],
+    K: ['South Korea', 'Asia'],
+    L: ['China', 'Asia'],
+    M: ['India / Asia', 'Asia'],
+    N: ['Turkey / Asia', 'Asia'],
+    P: ['Asia', 'Asia'],
+    R: ['Taiwan / Asia', 'Asia'],
+    S: ['United Kingdom', 'Europe'],
+    T: ['Europe (DE/CZ/HU)', 'Europe'],
+    V: ['Europe (FR/ES/AT)', 'Europe'],
+    W: ['Germany', 'Europe'],
+    X: ['Russia / Europe', 'Europe'],
+    Y: ['Europe (SE/FI/BY)', 'Europe'],
+    Z: ['Italy', 'Europe'],
   };
-  if (/[A-H]/.test(c)) return { country: "Africa", region: "Africa" };
+  if (/[A-H]/.test(c)) return { country: 'Africa', region: 'Africa' };
   const m = map[c];
   return m ? { country: m[0], region: m[1] } : {};
 }
@@ -199,7 +242,13 @@ export interface VinDecode {
 export function decodeVin(raw: string): VinDecode {
   const vin = normalizeVin(raw);
   const validation = validateVin(raw);
-  const result: VinDecode = { vin, validation, wmi: vin.slice(0, 3), vds: vin.slice(3, 9), vis: vin.slice(9, 17) };
+  const result: VinDecode = {
+    vin,
+    validation,
+    wmi: vin.slice(0, 3),
+    vds: vin.slice(3, 9),
+    vis: vin.slice(9, 17),
+  };
   if (validation.format.ok) {
     const origin = decodeOrigin(vin[0]);
     result.country = origin.country;

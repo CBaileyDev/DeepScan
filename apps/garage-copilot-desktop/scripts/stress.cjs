@@ -4,18 +4,18 @@
  * occur. Run: xvfb-run -a electron scripts/stress.cjs
  */
 
-const { app, BrowserWindow, ipcMain } = require("electron");
-const { join } = require("node:path");
+const { app, BrowserWindow, ipcMain } = require('electron');
+const { join } = require('node:path');
 
-ipcMain.handle("app:info", () => ({
-  appVersion: "stress",
+ipcMain.handle('app:info', () => ({
+  appVersion: 'stress',
   electron: process.versions.electron,
   chrome: process.versions.chrome,
-  platform: "linux"
+  platform: 'linux',
 }));
 
-const root = join(__dirname, "..");
-const sleep = ms => new Promise(r => setTimeout(r, ms));
+const root = join(__dirname, '..');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 app
   .whenReady()
@@ -23,11 +23,17 @@ app
     const fatal = [];
     const win = new BrowserWindow({
       show: false,
-      webPreferences: { preload: join(root, "dist", "main", "preload.cjs"), contextIsolation: true, sandbox: true }
+      webPreferences: {
+        preload: join(root, 'dist', 'main', 'preload.cjs'),
+        contextIsolation: true,
+        sandbox: true,
+      },
     });
-    win.webContents.on("render-process-gone", (_e, d) => fatal.push("render-process-gone: " + d.reason));
+    win.webContents.on('render-process-gone', (_e, d) =>
+      fatal.push('render-process-gone: ' + d.reason)
+    );
 
-    await win.loadFile(join(root, "dist", "renderer", "index.html"));
+    await win.loadFile(join(root, 'dist', 'renderer', 'index.html'));
 
     await win.webContents.executeJavaScript(`
       window.__errors = [];
@@ -56,27 +62,31 @@ app
       if (i === 0) first = r.val;
       last = r.val;
       cards = r.cards;
-      if (r.errors > 0) fatal.push("renderer errors: " + r.errors);
+      if (r.errors > 0) fatal.push('renderer errors: ' + r.errors);
     }
 
     const maxLag = Math.max(...lags);
-    console.log(`STRESS maxLag=${Math.round(maxLag)}ms lags=[${lags.map(x => Math.round(x)).join(",")}] cards=${cards} first=${first} last=${last}`);
+    console.log(
+      `STRESS maxLag=${Math.round(maxLag)}ms lags=[${lags.map((x) => Math.round(x)).join(',')}] cards=${cards} first=${first} last=${last}`
+    );
 
     if (fatal.length) {
-      console.error("STRESS_FAIL\n" + fatal.join("\n"));
+      console.error('STRESS_FAIL\n' + fatal.join('\n'));
       app.exit(1);
     } else if (maxLag >= 150) {
       console.error(`STRESS_FAIL main thread lag too high: ${Math.round(maxLag)}ms`);
       app.exit(1);
     } else if (cards < 5 || first === last) {
-      console.error(`STRESS_FAIL live data not updating (cards=${cards}, first=${first}, last=${last})`);
+      console.error(
+        `STRESS_FAIL live data not updating (cards=${cards}, first=${first}, last=${last})`
+      );
       app.exit(1);
     } else {
-      console.log("STRESS_OK");
+      console.log('STRESS_OK');
       app.exit(0);
     }
   })
-  .catch(err => {
-    console.error("STRESS_EXCEPTION", err && err.stack ? err.stack : err);
+  .catch((err) => {
+    console.error('STRESS_EXCEPTION', err && err.stack ? err.stack : err);
     app.exit(2);
   });

@@ -7,14 +7,14 @@
  * are public SAE J2012 / J1979 definitions, identical across makes.
  */
 
-const DTC_LETTERS = ["P", "C", "B", "U"] as const;
+const DTC_LETTERS = ['P', 'C', 'B', 'U'] as const;
 
 /** Parse a single ELM327 response line ("41 0C 1A F8") into bytes [0x41,...]. */
 export function parseHexBytes(line: string): number[] {
   const cleaned = line.trim().toUpperCase();
   if (cleaned.length === 0) return [];
   // Accept space-separated ("41 0C 1A F8") or packed ("410C1AF8") hex.
-  const compact = cleaned.replace(/\s+/g, "");
+  const compact = cleaned.replace(/\s+/g, '');
   if (!/^[0-9A-F]+$/.test(compact) || compact.length % 2 !== 0) return [];
   const bytes: number[] = [];
   for (let i = 0; i < compact.length; i += 2) {
@@ -82,7 +82,7 @@ export function decodeDtcResponse(
   const responses: number[][] = [];
   let current: number[] | null = null;
   for (const raw of lines) {
-    const bytes = parseHexBytes(raw.replace(/^[0-9A-Fa-f]+:\s*/, ""));
+    const bytes = parseHexBytes(raw.replace(/^[0-9A-Fa-f]+:\s*/, ''));
     if (bytes.length === 0) continue;
     const idx = bytes.indexOf(service);
     if (idx !== -1) {
@@ -102,7 +102,7 @@ export function decodeDtcResponse(
 }
 
 /** Monitor (I/M readiness) state for one monitor. */
-export type MonitorState = "ready" | "not-ready" | "not-supported";
+export type MonitorState = 'ready' | 'not-ready' | 'not-supported';
 
 /** A single readiness monitor and its decoded state. */
 export type ReadinessMonitor = { name: string; state: MonitorState };
@@ -114,15 +114,15 @@ export type MonitorStatus = {
   /** Number of confirmed DTCs the ECU reports alongside the MIL. */
   dtcCount: number;
   /** Engine type implied by byte B bit 3. */
-  ignitionType: "spark" | "compression";
+  ignitionType: 'spark' | 'compression';
   monitors: ReadinessMonitor[];
 };
 
 /** Continuous monitors live in byte B (low nibble = supported, high nibble = incomplete). */
 const CONTINUOUS = [
-  { name: "Misfire", bit: 0x01 },
-  { name: "Fuel System", bit: 0x02 },
-  { name: "Components", bit: 0x04 }
+  { name: 'Misfire', bit: 0x01 },
+  { name: 'Fuel System', bit: 0x02 },
+  { name: 'Components', bit: 0x04 },
 ] as const;
 
 /**
@@ -132,19 +132,19 @@ const CONTINUOUS = [
  * supported bit to suppress monitors a given vehicle does not implement.
  */
 const NON_CONTINUOUS = [
-  { name: "Catalyst", bit: 0x01 },
-  { name: "Heated Catalyst", bit: 0x02 },
-  { name: "Evaporative System", bit: 0x04 },
-  { name: "Secondary Air System", bit: 0x08 },
-  { name: "A/C Refrigerant", bit: 0x10 },
-  { name: "Oxygen Sensor", bit: 0x20 },
-  { name: "Oxygen Sensor Heater", bit: 0x40 },
-  { name: "EGR System", bit: 0x80 }
+  { name: 'Catalyst', bit: 0x01 },
+  { name: 'Heated Catalyst', bit: 0x02 },
+  { name: 'Evaporative System', bit: 0x04 },
+  { name: 'Secondary Air System', bit: 0x08 },
+  { name: 'A/C Refrigerant', bit: 0x10 },
+  { name: 'Oxygen Sensor', bit: 0x20 },
+  { name: 'Oxygen Sensor Heater', bit: 0x40 },
+  { name: 'EGR System', bit: 0x80 },
 ] as const;
 
 function monitorState(supported: boolean, incomplete: boolean): MonitorState {
-  if (!supported) return "not-supported";
-  return incomplete ? "not-ready" : "ready";
+  if (!supported) return 'not-supported';
+  return incomplete ? 'not-ready' : 'ready';
 }
 
 /**
@@ -173,7 +173,7 @@ export function decodeMonitorStatus(data: number[]): MonitorStatus {
   return {
     milOn: (a & 0x80) !== 0,
     dtcCount: a & 0x7f,
-    ignitionType: (b & 0x08) !== 0 ? "compression" : "spark",
-    monitors
+    ignitionType: (b & 0x08) !== 0 ? 'compression' : 'spark',
+    monitors,
   };
 }

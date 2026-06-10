@@ -7,8 +7,8 @@
  * the system clock and a real timer.
  */
 
-import type { ObdReader } from "../obd/reader.js";
-import type { TimedSample } from "./trends.js";
+import type { ObdReader } from '../obd/reader.js';
+import type { TimedSample } from './trends.js';
 
 export type RecorderOptions = {
   /** PID hex codes to sample each round. */
@@ -25,14 +25,17 @@ export type RecorderOptions = {
   onRound?: (round: number, samples: TimedSample[]) => void;
 };
 
-const realSleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+const realSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Record `rounds` of samples for the given PIDs. Unsupported/failed PIDs are
  * skipped for that round (never abort the recording). Returns the flat,
  * time-ordered series suitable for analyzeTrends().
  */
-export async function recordSeries(reader: ObdReader, options: RecorderOptions): Promise<TimedSample[]> {
+export async function recordSeries(
+  reader: ObdReader,
+  options: RecorderOptions
+): Promise<TimedSample[]> {
   const now = options.now ?? (() => Date.now());
   const sleep = options.sleep ?? realSleep;
   const intervalMs = options.intervalMs ?? 1000;
@@ -49,8 +52,14 @@ export async function recordSeries(reader: ObdReader, options: RecorderOptions):
       } catch {
         decoded = undefined;
       }
-      if (decoded && typeof decoded.value === "number") {
-        roundSamples.push({ pid: decoded.pid, label: decoded.label, value: decoded.value, unit: decoded.unit, t });
+      if (decoded && typeof decoded.value === 'number') {
+        roundSamples.push({
+          pid: decoded.pid,
+          label: decoded.label,
+          value: decoded.value,
+          unit: decoded.unit,
+          t,
+        });
       }
     }
     series.push(...roundSamples);

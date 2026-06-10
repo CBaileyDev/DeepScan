@@ -33,7 +33,7 @@ export type SeriesStats = {
 };
 
 export type TrendFlag = {
-  severity: "info" | "watch" | "warn";
+  severity: 'info' | 'watch' | 'warn';
   parameter: string;
   message: string;
 };
@@ -45,15 +45,15 @@ export type TrendReport = {
 };
 
 const TREND_CAVEAT =
-  "Trends are evidence from the supplied samples only. Confirm against service data and a known-good baseline before acting.";
+  'Trends are evidence from the supplied samples only. Confirm against service data and a known-good baseline before acting.';
 
 /** SAE J1979 Mode 01 PIDs referenced by the heuristics below. */
 const PID = {
-  ENGINE_RPM: "0C",
-  SHORT_TERM_FUEL_TRIM_B1: "06",
-  LONG_TERM_FUEL_TRIM_B1: "07",
-  COOLANT_TEMP: "05",
-  CONTROL_MODULE_VOLTAGE: "42"
+  ENGINE_RPM: '0C',
+  SHORT_TERM_FUEL_TRIM_B1: '06',
+  LONG_TERM_FUEL_TRIM_B1: '07',
+  COOLANT_TEMP: '05',
+  CONTROL_MODULE_VOLTAGE: '42',
 } as const;
 
 /** Heuristic thresholds. Conservative and documented; tune in one place. */
@@ -76,7 +76,7 @@ export function summarizeSeries(samples: TimedSample[]): SeriesStats[] {
   const stats: SeriesStats[] = [];
   for (const [pid, group] of byPid) {
     const sorted = [...group].sort((a, b) => a.t - b.t);
-    const values = sorted.map(s => s.value);
+    const values = sorted.map((s) => s.value);
     const sum = values.reduce((acc, v) => acc + v, 0);
     stats.push({
       pid,
@@ -88,7 +88,7 @@ export function summarizeSeries(samples: TimedSample[]): SeriesStats[] {
       avg: round(sum / values.length),
       first: sorted[0].value,
       last: sorted[sorted.length - 1].value,
-      slopePerMinute: round(slopePerMinute(sorted))
+      slopePerMinute: round(slopePerMinute(sorted)),
     });
   }
   return stats.sort((a, b) => a.pid.localeCompare(b.pid));
@@ -98,8 +98,8 @@ export function summarizeSeries(samples: TimedSample[]): SeriesStats[] {
 function slopePerMinute(sorted: TimedSample[]): number {
   if (sorted.length < 2) return 0;
   const t0 = sorted[0].t;
-  const xs = sorted.map(s => (s.t - t0) / 60000); // minutes since start
-  const ys = sorted.map(s => s.value);
+  const xs = sorted.map((s) => (s.t - t0) / 60000); // minutes since start
+  const ys = sorted.map((s) => s.value);
   const n = xs.length;
   const meanX = xs.reduce((a, b) => a + b, 0) / n;
   const meanY = ys.reduce((a, b) => a + b, 0) / n;
@@ -127,7 +127,7 @@ function recentAvg(stats: SeriesStats | undefined): number | undefined {
  */
 export function analyzeTrends(samples: TimedSample[]): TrendReport {
   const stats = summarizeSeries(samples);
-  const byPid = new Map(stats.map(s => [s.pid, s]));
+  const byPid = new Map(stats.map((s) => [s.pid, s]));
   const flags: TrendFlag[] = [];
 
   // Fuel trim (bank 1): combine STFT (06) + LTFT (07).
@@ -135,18 +135,18 @@ export function analyzeTrends(samples: TimedSample[]): TrendReport {
   const ltft = recentAvg(byPid.get(PID.LONG_TERM_FUEL_TRIM_B1));
   if (stft !== undefined && ltft !== undefined) {
     const total = round(stft + ltft);
-    const dir = total > 0 ? "lean (ECU adding fuel)" : "rich (ECU removing fuel)";
+    const dir = total > 0 ? 'lean (ECU adding fuel)' : 'rich (ECU removing fuel)';
     if (Math.abs(total) >= FUEL_TRIM_WARN_PCT) {
       flags.push({
-        severity: "warn",
-        parameter: "Fuel trim (bank 1)",
-        message: `Combined trim ${total > 0 ? "+" : ""}${total}% — strongly ${dir}. Investigate vacuum leaks, MAF, fuel delivery, or O2 sensors.`
+        severity: 'warn',
+        parameter: 'Fuel trim (bank 1)',
+        message: `Combined trim ${total > 0 ? '+' : ''}${total}% — strongly ${dir}. Investigate vacuum leaks, MAF, fuel delivery, or O2 sensors.`,
       });
     } else if (Math.abs(total) >= FUEL_TRIM_WATCH_PCT) {
       flags.push({
-        severity: "watch",
-        parameter: "Fuel trim (bank 1)",
-        message: `Combined trim ${total > 0 ? "+" : ""}${total}% — mildly ${dir}. Worth watching.`
+        severity: 'watch',
+        parameter: 'Fuel trim (bank 1)',
+        message: `Combined trim ${total > 0 ? '+' : ''}${total}% — mildly ${dir}. Worth watching.`,
       });
     }
   }
@@ -155,9 +155,9 @@ export function analyzeTrends(samples: TimedSample[]): TrendReport {
   const coolant = byPid.get(PID.COOLANT_TEMP);
   if (coolant && coolant.max >= COOLANT_OVERHEAT_C) {
     flags.push({
-      severity: "warn",
-      parameter: "Coolant temperature",
-      message: `Peaked at ${coolant.max} °C — above a typical ~105 °C ceiling. Check cooling system and thermostat.`
+      severity: 'warn',
+      parameter: 'Coolant temperature',
+      message: `Peaked at ${coolant.max} °C — above a typical ~105 °C ceiling. Check cooling system and thermostat.`,
     });
   }
 
@@ -166,9 +166,9 @@ export function analyzeTrends(samples: TimedSample[]): TrendReport {
   const rpm = byPid.get(PID.ENGINE_RPM);
   if (volt && rpm && rpm.avg > 0 && volt.avg < CHARGING_MIN_V) {
     flags.push({
-      severity: "watch",
-      parameter: "Charging voltage",
-      message: `Averaged ${volt.avg} V — below a healthy ~13.5–14.5 V charging range. Check alternator/belt/battery.`
+      severity: 'watch',
+      parameter: 'Charging voltage',
+      message: `Averaged ${volt.avg} V — below a healthy ~13.5–14.5 V charging range. Check alternator/belt/battery.`,
     });
   }
 

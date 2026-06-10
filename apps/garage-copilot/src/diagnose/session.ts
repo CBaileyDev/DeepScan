@@ -10,9 +10,9 @@
  * over alongside the other MCP servers.
  */
 
-import type { ObdReader, ObdIdentity } from "../obd/reader.js";
-import type { DecodedPid } from "../obd/pid-formulas.js";
-import type { MonitorStatus, ReadinessMonitor } from "../obd/dtc-decode.js";
+import type { ObdReader, ObdIdentity } from '../obd/reader.js';
+import type { DecodedPid } from '../obd/pid-formulas.js';
+import type { MonitorStatus, ReadinessMonitor } from '../obd/dtc-decode.js';
 
 /** Everything gathered in one diagnostic pass. Pure evidence, no diagnosis. */
 export type DiagnosticSnapshot = {
@@ -21,7 +21,7 @@ export type DiagnosticSnapshot = {
   milOn: boolean;
   /** DTC count as reported by the ECU monitor status (authoritative count). */
   reportedDtcCount: number;
-  ignitionType: MonitorStatus["ignitionType"];
+  ignitionType: MonitorStatus['ignitionType'];
   storedDtcs: string[];
   pendingDtcs: string[];
   permanentDtcs: string[];
@@ -42,7 +42,7 @@ export type SessionOptions = {
   now?: () => Date;
 };
 
-const DEFAULT_LIVE_PIDS = ["0C", "0D", "05", "0F", "11", "06", "07", "42"];
+const DEFAULT_LIVE_PIDS = ['0C', '0D', '05', '0F', '11', '06', '07', '42'];
 
 /**
  * Drive a reader through a complete read-only pass. Individual optional reads
@@ -62,23 +62,38 @@ export async function runDiagnosticSession(
   const status = await reader.readMonitorStatus();
 
   const storedDtcs = await reader.readStoredDtcs();
-  const pendingDtcs = await safe(() => reader.readPendingDtcs(), warnings, "read pending DTCs (mode 07)", []);
+  const pendingDtcs = await safe(
+    () => reader.readPendingDtcs(),
+    warnings,
+    'read pending DTCs (mode 07)',
+    []
+  );
   const permanentDtcs = await safe(
     () => reader.readPermanentDtcs(),
     warnings,
-    "read permanent DTCs (mode 0A)",
+    'read permanent DTCs (mode 0A)',
     []
   );
 
   const livePids: DecodedPid[] = [];
   for (const pid of pidList) {
-    const decoded = await safe(() => reader.readLivePid(pid), warnings, `read live PID ${pid}`, undefined);
+    const decoded = await safe(
+      () => reader.readLivePid(pid),
+      warnings,
+      `read live PID ${pid}`,
+      undefined
+    );
     if (decoded) livePids.push(decoded);
   }
 
-  const voltage = await safe(() => reader.readVoltage(), warnings, "read voltage (ATRV)", undefined);
+  const voltage = await safe(
+    () => reader.readVoltage(),
+    warnings,
+    'read voltage (ATRV)',
+    undefined
+  );
   const vin = reader.readVin
-    ? await safe(() => reader.readVin!(), warnings, "read VIN (mode 09)", undefined)
+    ? await safe(() => reader.readVin!(), warnings, 'read VIN (mode 09)', undefined)
     : undefined;
 
   return {
@@ -91,11 +106,11 @@ export async function runDiagnosticSession(
     pendingDtcs,
     permanentDtcs,
     readiness: status.monitors,
-    notReadyMonitors: status.monitors.filter(m => m.state === "not-ready").map(m => m.name),
+    notReadyMonitors: status.monitors.filter((m) => m.state === 'not-ready').map((m) => m.name),
     livePids,
     voltage,
     vin,
-    warnings
+    warnings,
   };
 }
 

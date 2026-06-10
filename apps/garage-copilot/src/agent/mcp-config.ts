@@ -18,28 +18,28 @@ export type McpConfig = { mcpServers: Record<string, McpServerEntry> };
 
 /** Servers in this repo, with any default env needed to run key-free. */
 const SERVERS: Array<{ name: string; env?: Record<string, string> }> = [
-  { name: "vpic" },
-  { name: "garage-memory" },
-  { name: "repair-info" },
-  { name: "part-interchange" },
-  { name: "vehicle-context-fitment" },
-  { name: "obd-diagnostics" },
-  { name: "fuel-economy-emissions" },
-  { name: "local-auto-services" },
-  { name: "ev-charging-range", env: { AFDC_API_KEY: "DEMO_KEY" } },
-  { name: "tire-wheel-fitment" },
-  { name: "drivetrain-gearing" },
-  { name: "automotive-unit-converter" },
-  { name: "automotive-electrical" },
-  { name: "engine-build-math" },
-  { name: "towing-payload-math" },
-  { name: "rockauto-catalog-search" },
-  { name: "marketplace-pricing" }
+  { name: 'vpic' },
+  { name: 'garage-memory' },
+  { name: 'repair-info' },
+  { name: 'part-interchange' },
+  { name: 'vehicle-context-fitment' },
+  { name: 'obd-diagnostics' },
+  { name: 'fuel-economy-emissions' },
+  { name: 'local-auto-services' },
+  { name: 'ev-charging-range', env: { AFDC_API_KEY: 'DEMO_KEY' } },
+  { name: 'tire-wheel-fitment' },
+  { name: 'drivetrain-gearing' },
+  { name: 'automotive-unit-converter' },
+  { name: 'automotive-electrical' },
+  { name: 'engine-build-math' },
+  { name: 'towing-payload-math' },
+  { name: 'rockauto-catalog-search' },
+  { name: 'marketplace-pricing' },
 ];
 
 /** Join a repo root and a server path into an absolute entrypoint, POSIX-style. */
 function entrypoint(repoRoot: string, server: string): string {
-  const root = repoRoot.replace(/\/+$/, "");
+  const root = repoRoot.replace(/\/+$/, '');
   return `${root}/servers/${server}/dist/index.js`;
 }
 
@@ -49,14 +49,14 @@ function entrypoint(repoRoot: string, server: string): string {
  * subset of names to limit it.
  */
 export function buildMcpConfig(repoRoot: string, only?: string[]): McpConfig {
-  if (typeof repoRoot !== "string" || repoRoot.trim() === "") {
-    throw new Error("buildMcpConfig: repoRoot (absolute path to the MCPs repo) is required");
+  if (typeof repoRoot !== 'string' || repoRoot.trim() === '') {
+    throw new Error('buildMcpConfig: repoRoot (absolute path to the MCPs repo) is required');
   }
   const wanted = only ? new Set(only) : undefined;
   const mcpServers: Record<string, McpServerEntry> = {};
   for (const server of SERVERS) {
     if (wanted && !wanted.has(server.name)) continue;
-    const entry: McpServerEntry = { command: "node", args: [entrypoint(repoRoot, server.name)] };
+    const entry: McpServerEntry = { command: 'node', args: [entrypoint(repoRoot, server.name)] };
     if (server.env) entry.env = { ...server.env };
     mcpServers[server.name] = entry;
   }
@@ -65,7 +65,7 @@ export function buildMcpConfig(repoRoot: string, only?: string[]): McpConfig {
 
 /** All server names known to the generator. */
 export function knownServers(): string[] {
-  return SERVERS.map(s => s.name);
+  return SERVERS.map((s) => s.name);
 }
 
 /** Render the config as pretty JSON. */

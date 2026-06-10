@@ -9,10 +9,10 @@
  * story. Values are illustrative only.
  */
 
-import type { ObdIdentity, ObdReader } from "./reader.js";
-import type { DecodedPid } from "./pid-formulas.js";
-import { PID_FORMULAS } from "./pid-formulas.js";
-import { decodeMonitorStatus, type MonitorStatus } from "./dtc-decode.js";
+import type { ObdIdentity, ObdReader } from './reader.js';
+import type { DecodedPid } from './pid-formulas.js';
+import { PID_FORMULAS } from './pid-formulas.js';
+import { decodeMonitorStatus, type MonitorStatus } from './dtc-decode.js';
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
@@ -36,7 +36,7 @@ export class SimulatedObdReader implements ObdReader {
   }
 
   async initialize(): Promise<ObdIdentity> {
-    return { description: "ELM327 v1.5 (simulated)", protocol: "ISO 15765-4 (CAN 11/500)" };
+    return { description: 'ELM327 v1.5 (simulated)', protocol: 'ISO 15765-4 (CAN 11/500)' };
   }
 
   async readMonitorStatus(): Promise<MonitorStatus> {
@@ -45,7 +45,7 @@ export class SimulatedObdReader implements ObdReader {
   }
 
   async readStoredDtcs(): Promise<string[]> {
-    return ["P0301", "P0420"];
+    return ['P0301', 'P0420'];
   }
   async readPendingDtcs(): Promise<string[]> {
     return [];
@@ -54,7 +54,7 @@ export class SimulatedObdReader implements ObdReader {
     return [];
   }
   async readVin(): Promise<string | undefined> {
-    return "1HGBH41JXMN109186";
+    return '1HGBH41JXMN109186';
   }
 
   async readVoltage(): Promise<number | undefined> {
@@ -75,35 +75,35 @@ export class SimulatedObdReader implements ObdReader {
     const t = this.elapsed();
     const wobble = (hz: number) => Math.sin(t * hz);
     switch (code) {
-      case "0C": // RPM — idle wander around ~815
+      case '0C': // RPM — idle wander around ~815
         return 815 + 35 * wobble(1.3) + 8 * wobble(4.1);
-      case "0D": // Vehicle speed — parked
+      case '0D': // Vehicle speed — parked
         return 0;
-      case "05": // Coolant — warm-up curve toward ~92 C
+      case '05': // Coolant — warm-up curve toward ~92 C
         return Math.min(92, 40 + 52 * (1 - Math.exp(-t / 35))) + 0.6 * wobble(0.2);
-      case "0F": // Intake air temp — slowly rising with bay heat
+      case '0F': // Intake air temp — slowly rising with bay heat
         return 30 + 3 * (1 - Math.exp(-t / 60));
-      case "11": // Throttle — closed at idle with tiny jitter
+      case '11': // Throttle — closed at idle with tiny jitter
         return 13.5 + 1.2 * wobble(0.6);
-      case "06": // STFT — small correction, jittering
+      case '06': // STFT — small correction, jittering
         return 2 + 3.5 * wobble(0.9);
-      case "07": // LTFT — leaning a touch (matches the demo's "watch" flag)
+      case '07': // LTFT — leaning a touch (matches the demo's "watch" flag)
         return 7 + 1.5 * wobble(0.15);
-      case "42": // Module voltage
+      case '42': // Module voltage
         return 14.2 + 0.12 * wobble(0.5);
-      case "04": // Calculated engine load — light at idle
+      case '04': // Calculated engine load — light at idle
         return 18 + 5 * wobble(0.8);
-      case "0B": // Intake manifold pressure — idle vacuum
+      case '0B': // Intake manifold pressure — idle vacuum
         return 33 + 4 * wobble(0.7);
-      case "0E": // Timing advance
+      case '0E': // Timing advance
         return 10 + 4 * wobble(0.5);
-      case "10": // Mass air flow — idle
+      case '10': // Mass air flow — idle
         return 3.2 + 0.6 * wobble(0.9);
-      case "2F": // Fuel tank level
+      case '2F': // Fuel tank level
         return 62 - t * 0.002;
-      case "46": // Ambient air temp
+      case '46': // Ambient air temp
         return 22;
-      case "5C": // Oil temp — warms slower than coolant
+      case '5C': // Oil temp — warms slower than coolant
         return Math.min(98, 40 + 58 * (1 - Math.exp(-t / 55)));
       default:
         return undefined;
@@ -112,7 +112,23 @@ export class SimulatedObdReader implements ObdReader {
 
   /** The PIDs this simulated ECU "supports" — a realistic spark-ignition set. */
   async readSupportedPids(): Promise<string[]> {
-    return ["04", "05", "06", "07", "0B", "0C", "0D", "0E", "0F", "10", "11", "2F", "42", "46", "5C"];
+    return [
+      '04',
+      '05',
+      '06',
+      '07',
+      '0B',
+      '0C',
+      '0D',
+      '0E',
+      '0F',
+      '10',
+      '11',
+      '2F',
+      '42',
+      '46',
+      '5C',
+    ];
   }
 
   async close(): Promise<void> {

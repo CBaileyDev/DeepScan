@@ -5,7 +5,7 @@
  */
 
 /** Hosts the app is allowed to hand to the OS browser. Keep this minimal. */
-export const EXTERNAL_HOST_ALLOWLIST = ["google.com"] as const;
+export const EXTERNAL_HOST_ALLOWLIST = ['google.com'] as const;
 
 /**
  * Whether `raw` may be opened in the OS browser via `shell.openExternal`.
@@ -22,10 +22,12 @@ export function isAllowedExternalUrl(raw: string): boolean {
   } catch {
     return false; // not a parseable absolute URL
   }
-  if (url.protocol !== "https:") return false;
-  if (url.username !== "" || url.password !== "") return false; // userinfo spoofing
+  if (url.protocol !== 'https:') return false;
+  if (url.username !== '' || url.password !== '') return false; // userinfo spoofing
   const host = url.hostname.toLowerCase();
-  return EXTERNAL_HOST_ALLOWLIST.some(allowed => host === allowed || host.endsWith(`.${allowed}`));
+  return EXTERNAL_HOST_ALLOWLIST.some(
+    (allowed) => host === allowed || host.endsWith(`.${allowed}`)
+  );
 }
 
 /**
@@ -33,5 +35,5 @@ export function isAllowedExternalUrl(raw: string): boolean {
  * loaded from disk (`file://`), so any other origin is treated as untrusted.
  */
 export function isTrustedFrameUrl(url: string | undefined): boolean {
-  return typeof url === "string" && url.startsWith("file://");
+  return typeof url === 'string' && url.startsWith('file://');
 }
