@@ -192,6 +192,13 @@ function cmdAdvise(f: Flags): void {
 
 function cmdMcpConfig(f: Flags): void {
   const root = typeof f.flags.root === "string" ? f.flags.root : findRepoRoot(process.cwd());
+  // Warn if servers/ not found (DeepScan may not have MCP integration)
+  if (!existsSync(join(root, "servers"))) {
+    console.warn("⚠ No servers/ folder found at:", root);
+    console.warn("  This command is designed for the full MCPs repo with MCP servers installed.");
+    console.warn("  If you have MCP servers set up elsewhere, use: deepscan mcp-config --root /path/to/MCPs");
+    console.warn("");
+  }
   console.log(renderMcpConfig(root));
 }
 

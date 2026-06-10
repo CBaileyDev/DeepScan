@@ -1,8 +1,11 @@
 /**
- * The diagnostic playbook: a system prompt that tells Claude how to act as a
- * garage co-pilot, chaining the repo's MCP servers around a Garage Copilot
- * diagnostic snapshot. This is the orchestration recipe — the deterministic
- * snapshot is the evidence; this prompt is how the LLM reasons over it.
+ * The diagnostic playbook: a system prompt for Claude to act as a diagnostic
+ * co-pilot, chaining DeepScan engine output with optional MCP servers. The
+ * snapshot is the evidence; this prompt teaches Claude how to reason over it.
+ *
+ * This playbook assumes MCP servers (vpic, repair-info, etc.) are available.
+ * If running DeepScan standalone without servers, you can still use the
+ * diagnostic snapshot without the orchestration logic.
  *
  * Exported as a constant plus a builder so the CLI can print it and a host app
  * (e.g. one built on the Claude Agent SDK) can use it directly.
