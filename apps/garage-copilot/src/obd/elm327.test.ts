@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Elm327Client, ObdError } from './elm327.js';
+import { Elm327Client, ObdError, isCanProtocol, likelyCanDtcResponse } from './elm327.js';
 import { ReplayTransport } from './replay-transport.js';
 import { DEMO_VEHICLE } from './recordings.js';
 import type { ObdTransport } from './transport.js';
@@ -119,6 +119,36 @@ describe('Elm327Client robustness', () => {
     };
     const client = new Elm327Client(silent, { timeoutMs: 20 });
     await expect(client.send('0100')).rejects.toThrow(/Timed out/);
+  });
+
+  it('detects CAN via ATDPN protocol numbers 6–9', () => {
+    expect(isCanProtocol('unknown', 6)).toBe(true);
+    expect(isCanProtocol('unknown', 9)).toBe(true);
+    expect(isCanProtocol('ISO 9141-2', 3)).toBe(false);
+    expect(isCanProtocol('ISO 15765-4 (CAN 11/500)')).toBe(true);
+  });
+
+  it('infers CAN DTC count byte when protocol was unknown', () => {
+    expect(likelyCanDtcResponse(['43 02 03 01 04 20'], 0x43)).toBe(true);
+    expect(likelyCanDtcResponse(['43 03 01 04 20'], 0x43)).toBe(false);
+  });
+
+  it('decodes stored DTCs with inferred CAN count byte after unknown protocol', async () => {
+    const transport = new ReplayTransport({
+      ATZ: 'ELM327 v1.5',
+      ATE0: 'OK',
+      ATL0: 'OK',
+      ATS0: 'OK',
+      ATH0: 'OK',
+      ATSP0: 'OK',
+      '0100': '4100BE3FA813',
+      ATDP: 'unknown',
+      ATDPN: '0',
+      '03': '43 02 03 01 04 20',
+    });
+    const client = new Elm327Client(transport);
+    await client.initialize();
+    expect(await client.readStoredDtcs()).toEqual(['P0301', 'P0420']);
   });
 
   it('honors a per-call timeout override', async () => {

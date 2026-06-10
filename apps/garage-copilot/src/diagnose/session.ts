@@ -40,9 +40,23 @@ export type SessionOptions = {
   livePids?: string[];
   /** Clock injection for deterministic timestamps in tests. */
   now?: () => Date;
+  /**
+   * Skip {@link ObdReader.initialize} when the reader is already configured
+   * (e.g. the desktop app initializes on connect). Requires `identity`.
+   */
+  skipInitialize?: boolean;
+  /** Adapter identity from a prior initialize(); required when `skipInitialize`. */
+  identity?: ObdIdentity;
 };
 
 const DEFAULT_LIVE_PIDS = ['0C', '0D', '05', '0F', '11', '06', '07', '42'];
+
+const EMPTY_MONITOR_STATUS: MonitorStatus = {
+  milOn: false,
+  dtcCount: 0,
+  ignitionType: 'spark',
+  monitors: [],
+};
 
 /**
  * Drive a reader through a complete read-only pass. Individual optional reads
@@ -58,10 +72,22 @@ export async function runDiagnosticSession(
   const pidList = options.livePids ?? DEFAULT_LIVE_PIDS;
   const warnings: string[] = [];
 
-  const identity = await reader.initialize();
-  const status = await reader.readMonitorStatus();
+  const identity =
+    options.skipInitialize && options.identity ? options.identity : await reader.initialize();
 
-  const storedDtcs = await reader.readStoredDtcs();
+  const status = await safe(
+    () => reader.readMonitorStatus(),
+    warnings,
+    'read monitor status (mode 01 PID 01)',
+    EMPTY_MONITOR_STATUS
+  );
+
+  const storedDtcs = await safe(
+    () => reader.readStoredDtcs(),
+    warnings,
+    'read stored DTCs (mode 03)',
+    []
+  );
   const pendingDtcs = await safe(
     () => reader.readPendingDtcs(),
     warnings,

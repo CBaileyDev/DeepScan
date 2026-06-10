@@ -811,20 +811,20 @@ export const MAKE_ALIASES: Record<string, string> = {
   toyota: 'Toyota',
   honda: 'Honda',
   nissan: 'Nissan',
-  mazda: 'Nissan', // Often shares platforms; fallback to Nissan codes
+  mazda: 'GENERIC',
   datsun: 'Nissan',
   subaru: 'Subaru',
-  mitsubishi: 'Honda', // Similar platforms to Honda
+  mitsubishi: 'GENERIC',
 
   // European
   ford: 'Ford',
   bmw: 'BMW',
   audi: 'Audi',
-  mercedes: 'BMW', // Similar code schemes
-  'mercedes-benz': 'BMW',
-  benz: 'BMW',
-  porsche: 'Audi', // Audi group
-  skoda: 'Volkswagen', // VW group
+  mercedes: 'GENERIC',
+  'mercedes-benz': 'GENERIC',
+  benz: 'GENERIC',
+  porsche: 'Audi',
+  skoda: 'Volkswagen',
 };
 
 /**

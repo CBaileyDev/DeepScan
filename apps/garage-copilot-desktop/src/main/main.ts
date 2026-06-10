@@ -21,7 +21,13 @@ import {
 } from 'electron';
 import { join } from 'node:path';
 import { readFile, writeFile, rename, mkdir } from 'node:fs/promises';
-import { IPC, type AppInfo, type HistoryRecord, type SerialPortInfo } from '../shared/ipc.js';
+import {
+  IPC,
+  isValidHistoryRecord,
+  type AppInfo,
+  type HistoryRecord,
+  type SerialPortInfo,
+} from '../shared/ipc.js';
 import { isAllowedExternalUrl, isTrustedFrameUrl } from './url-allowlist.js';
 
 /**
@@ -173,8 +179,9 @@ ipcMain.handle(IPC.HistoryList, (event): Promise<HistoryRecord[]> => {
   return readHistory();
 });
 
-ipcMain.handle(IPC.HistorySave, async (event, record: HistoryRecord): Promise<HistoryRecord[]> => {
+ipcMain.handle(IPC.HistorySave, async (event, record: unknown): Promise<HistoryRecord[]> => {
   if (!isTrustedSender(event)) throw new Error('Untrusted IPC sender');
+  if (!isValidHistoryRecord(record)) throw new Error('Invalid history record');
   const records = await readHistory();
   records.unshift(record); // newest first
   const capped = records.slice(0, HISTORY_CAP);
@@ -208,7 +215,7 @@ function buildMenu(): Menu {
       label: 'View',
       submenu: [
         { role: 'reload' },
-        { role: 'toggleDevTools' },
+        ...(!app.isPackaged ? ([{ role: 'toggleDevTools' }] as MenuItemConstructorOptions[]) : []),
         { type: 'separator' },
         { role: 'resetZoom' },
         { role: 'zoomIn' },

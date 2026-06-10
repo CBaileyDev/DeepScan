@@ -125,13 +125,8 @@ const CONTINUOUS = [
   { name: 'Components', bit: 0x04 },
 ] as const;
 
-/**
- * Non-continuous monitors in bytes C (supported) and D (incomplete), spark-
- * ignition bit layout (SAE J1979). Compression-ignition uses a different set
- * for some bits; we label using the common spark-ignition names and rely on the
- * supported bit to suppress monitors a given vehicle does not implement.
- */
-const NON_CONTINUOUS = [
+/** Non-continuous monitors — spark-ignition bit layout (SAE J1979). */
+const NON_CONTINUOUS_SPARK = [
   { name: 'Catalyst', bit: 0x01 },
   { name: 'Heated Catalyst', bit: 0x02 },
   { name: 'Evaporative System', bit: 0x04 },
@@ -140,6 +135,17 @@ const NON_CONTINUOUS = [
   { name: 'Oxygen Sensor', bit: 0x20 },
   { name: 'Oxygen Sensor Heater', bit: 0x40 },
   { name: 'EGR System', bit: 0x80 },
+] as const;
+
+/** Non-continuous monitors — compression-ignition bit layout (SAE J1979). */
+const NON_CONTINUOUS_COMPRESSION = [
+  { name: 'NMHC Catalyst', bit: 0x01 },
+  { name: 'NOx/SCR Monitor', bit: 0x02 },
+  { name: 'EGR/VVT System', bit: 0x04 },
+  { name: 'PM Filter', bit: 0x08 },
+  { name: 'Exhaust Gas Sensor', bit: 0x10 },
+  { name: 'Exhaust Gas Sensor Heater', bit: 0x20 },
+  { name: 'Boost Pressure', bit: 0x40 },
 ] as const;
 
 function monitorState(supported: boolean, incomplete: boolean): MonitorState {
@@ -157,6 +163,7 @@ export function decodeMonitorStatus(data: number[]): MonitorStatus {
     throw new Error(`Monitor status needs 4 data bytes, got ${data.length}`);
   }
   const [a, b, c, d] = data;
+  const ignitionType: MonitorStatus['ignitionType'] = (b & 0x08) !== 0 ? 'compression' : 'spark';
   const monitors: ReadinessMonitor[] = [];
 
   for (const m of CONTINUOUS) {
@@ -164,7 +171,9 @@ export function decodeMonitorStatus(data: number[]): MonitorStatus {
     const incomplete = (b & (m.bit << 4)) !== 0;
     monitors.push({ name: m.name, state: monitorState(supported, incomplete) });
   }
-  for (const m of NON_CONTINUOUS) {
+  const nonContinuous =
+    ignitionType === 'compression' ? NON_CONTINUOUS_COMPRESSION : NON_CONTINUOUS_SPARK;
+  for (const m of nonContinuous) {
     const supported = (c & m.bit) !== 0;
     const incomplete = (d & m.bit) !== 0;
     monitors.push({ name: m.name, state: monitorState(supported, incomplete) });
@@ -173,7 +182,7 @@ export function decodeMonitorStatus(data: number[]): MonitorStatus {
   return {
     milOn: (a & 0x80) !== 0,
     dtcCount: a & 0x7f,
-    ignitionType: (b & 0x08) !== 0 ? 'compression' : 'spark',
+    ignitionType,
     monitors,
   };
 }

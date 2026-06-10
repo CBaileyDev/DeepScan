@@ -14,30 +14,13 @@ and the user interface.
 
 ## Screens
 
-**Diagnose** — MIL status, trouble codes (with structural decode), I/M readiness, live snapshot:
+The app has five main tabs:
 
-![Diagnose](./assets/screenshots/diagnose.png)
-
-**Live Monitor** — streaming parameters with sparklines and health flags. The
-gauges **adapt to your car**: on connect it discovers which PIDs the ECU actually
-supports and shows those (no wasted polls on unsupported parameters):
-
-![Live Monitor](./assets/screenshots/live.png)
-
-**Tune Advisor** — validate a change (gearing, injectors, electrical load) before you commit:
-
-![Tune Advisor](./assets/screenshots/tune.png)
-
-**History** — every scan is saved automatically so you can track the vehicle over time:
-
-![History](./assets/screenshots/history.png)
-
-**VIN Checker** — validate any VIN (format + North-American check digit) and decode
-its structure (country, model year, plant) entirely offline; the car's VIN auto-fills
-after a scan. An optional one-click **online lookup** queries NHTSA's vPIC API for the
-full make/model/engine.
-
-![VIN Checker](./assets/screenshots/vin.png)
+- **Diagnose** — MIL status, trouble codes (with structural decode), I/M readiness, live snapshot
+- **Live Monitor** — streaming parameters with sparklines and health flags; gauges adapt to PIDs your ECU supports
+- **Tune Advisor** — validate gearing, injector, or electrical-load changes before you commit
+- **History** — every scan is saved automatically so you can track the vehicle over time
+- **VIN Checker** — offline VIN validation/decode plus optional NHTSA vPIC lookup
 
 There's also a **Metric / Imperial** units toggle (°C↔°F, km/h↔mph, kPa↔psi, …)
 that applies across the report, live gauges, and saved scans.

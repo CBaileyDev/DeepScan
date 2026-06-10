@@ -57,7 +57,7 @@ The core diagnostic library: ELM327 driver, SAE J1979 OBD-II decoder, trend anal
 ```bash
 cd apps/garage-copilot
 npm install && npm run build
-npm test                  # 93 unit tests
+npm test                  # 134 unit tests (engine + desktop)
 node dist/cli.js diagnose --vehicle "2014 Subaru Forester"
 ```
 

@@ -100,6 +100,15 @@ describe('decodeMonitorStatus', () => {
     expect(status.ignitionType).toBe('compression'); // B bit3 set
   });
 
+  it('uses compression-ignition monitor names when byte B bit 3 is set', () => {
+    // C=0x05 -> NMHC + EGR/VVT supported; D=0x01 -> NMHC incomplete.
+    const status = decodeMonitorStatus([0x00, 0x0f, 0x05, 0x01]);
+    const byName = Object.fromEntries(status.monitors.map((m) => [m.name, m.state]));
+    expect(byName['NMHC Catalyst']).toBe('not-ready');
+    expect(byName['EGR/VVT System']).toBe('ready');
+    expect(byName['Catalyst']).toBeUndefined();
+  });
+
   it('throws on a short frame', () => {
     expect(() => decodeMonitorStatus([0x82, 0x07])).toThrow(/4 data bytes/);
   });
