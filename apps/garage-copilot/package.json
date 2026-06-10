@@ -1,10 +1,10 @@
 {
-  "name": "@cbaileydev/garage-copilot",
+  "name": "@deepscan/engine",
   "version": "0.1.0",
-  "description": "Garage Copilot: a live OBD-II bridge (real ELM327 driver) plus diagnose / monitor / tune-advise engines, and the Claude wiring that orchestrates the automotive MCP servers in this repo. Read-only by design; runs fully offline via a replay transport (no hardware required to build, test, or demo).",
+  "description": "DeepScan engine: a live OBD-II bridge (real ELM327 driver) plus diagnose / monitor / tune-advise engines for automotive diagnostics. Read-only by design; runs fully offline via a replay transport (no hardware required to build, test, or demo).",
   "type": "module",
   "bin": {
-    "garage-copilot": "./dist/cli.js"
+    "deepscan": "./dist/cli.js"
   },
   "main": "./dist/index.js",
   "scripts": {

@@ -1,13 +1,13 @@
-# Garage Copilot Desktop
+# DeepScan
 
 A read-only desktop app for your car. Plug a standard ELM327 adapter into the
 OBD-II port, open the app, and get a clear picture of what the car is reporting —
 trouble codes, readiness, live data — plus live monitoring and a tune-planning
-advisor. Runs on macOS, Windows, and Linux, with a real GUI.
+advisor. Runs on macOS, Windows, and Linux, with a professional cross-platform GUI.
 
-It's the desktop face of the [Garage Copilot engine](../garage-copilot): all the
-OBD logic is the same tested code; this app adds the window and the hardware
-connection.
+This is the desktop application for DeepScan. All OBD logic comes from the tested
+[engine module](../garage-copilot); this app adds the window, serial connectivity,
+and the user interface.
 
 > **Read-only.** It never clears codes, writes to the ECU, or runs active tests.
 > The "tune" tools are planning math, not a flasher.
@@ -93,7 +93,7 @@ until you configure code signing (and notarization on macOS) for distribution.
 ```
 Electron main (tiny)          Renderer (the GUI)
 ─────────────────────         ───────────────────────────────
-window + serial picker  ◀──▶  Web Serial ▶ Garage Copilot engine
+window + serial picker  ◀──▶  Web Serial ▶ DeepScan engine
 (select-serial-port)          (WebSerialTransport)   (diagnose/
                               ReplayTransport (demo)  monitor/tune)
 ```

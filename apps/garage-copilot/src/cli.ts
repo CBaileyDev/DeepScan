@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Garage Copilot CLI.
+ * DeepScan CLI.
  *
  * Commands:
  *   diagnose   Run a read-only diagnostic pass and print a report.
@@ -185,7 +185,7 @@ function cmdAdvise(f: Flags): void {
       );
       break;
     default:
-      console.error("Usage: garage-copilot advise <final-drive|injectors|load> [flags]");
+      console.error("Usage: deepscan advise <final-drive|injectors|load> [flags]");
       process.exitCode = 1;
   }
 }
@@ -201,7 +201,7 @@ function cmdPlaybook(f: Flags): void {
 }
 
 function usage(): void {
-  console.log(`garage-copilot <command> [flags]
+  console.log(`deepscan <command> [flags]
 
 Commands:
   diagnose    [--port PATH | --demo | --sim] [--baud N] [--vehicle "label"]
