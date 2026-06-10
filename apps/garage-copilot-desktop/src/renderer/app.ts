@@ -13,13 +13,9 @@ import {
   runDiagnosticSession,
   buildReport,
   analyzeTrends,
-  assessFinalDriveChange,
-  assessInjectorsForTarget,
-  assessAddedElectricalLoad,
   PID_FORMULAS,
   convertUnit,
   type ObdReader,
-  type Assessment,
   type TimedSample,
   type UnitSystem,
   type DiagnosticSnapshot
@@ -28,6 +24,7 @@ import { WebSerialTransport } from "./web-serial.js";
 import { toCsv, lineSeverityClass, dtcSearchUrl, dtcCodeInLine, boundedPush } from "./format.js";
 import { VinViewController, metricsCard } from "./vin-view.js";
 import { HistoryViewController } from "./history-view.js";
+import { TuneAdvisorController } from "./tune-forms.js";
 import { infoLine, errorLine, errMsg } from "./ui-helpers.js";
 import type { SerialPortInfo, HistoryRecord } from "../shared/ipc.js";
 
@@ -54,6 +51,7 @@ let liveTimer: number | null = null;
 let liveSamples: TimedSample[] = [];
 let vin: VinViewController;
 let history: HistoryViewController;
+let tune: TuneAdvisorController;
 type Zone = "ok" | "watch" | "warn";
 type LiveCard = { card: HTMLElement; numEl: HTMLElement; unitEl: HTMLElement; canvas: HTMLCanvasElement };
 type HeroGauge = { canvas: HTMLCanvasElement; value: number; unit?: string };
@@ -752,185 +750,6 @@ function renderFlags(): void {
   }
 }
 
-// ---- tune advisor -----------------------------------------------------------
-// Human-readable labels + units for the assessment `details` keys, so the UI
-// never shows raw object keys like "requiredCcMin".
-const TUNE_LABELS: Record<string, string> = {
-  currentRpm: "Current cruise RPM",
-  newRpm: "New cruise RPM",
-  deltaPct: "Change",
-  requiredCcMin: "Required injector",
-  proposedCcMin: "Proposed injector",
-  headroomPct: "Headroom",
-  perInjectorLbHr: "Fuel per injector",
-  totalLbHr: "Total fuel",
-  addedAmps: "Added draw",
-  totalAmps: "Total draw",
-  utilizationPct: "Alternator load"
-};
-const TUNE_UNITS: Record<string, string> = {
-  currentRpm: "rpm",
-  newRpm: "rpm",
-  deltaPct: "%",
-  requiredCcMin: "cc/min",
-  proposedCcMin: "cc/min",
-  headroomPct: "%",
-  perInjectorLbHr: "lb/hr",
-  totalLbHr: "lb/hr",
-  addedAmps: "A",
-  totalAmps: "A",
-  utilizationPct: "%"
-};
-
-function tuneLabel(key: string): string {
-  return TUNE_LABELS[key] ?? key.replace(/([A-Z])/g, " $1").replace(/^./, c => c.toUpperCase());
-}
-function tuneValue(key: string, value: number | string): string {
-  const signed = (key === "deltaPct" || key === "headroomPct") && typeof value === "number" && value > 0 ? `+${value}` : String(value);
-  const unit = TUNE_UNITS[key];
-  return unit ? `${signed} ${unit}` : signed;
-}
-const numOf = (v: number | string): number => (typeof v === "number" ? v : Number(v));
-
-function renderAssessment(targetId: string, run: () => Assessment): void {
-  const target = $(targetId);
-  try {
-    const a = run();
-    target.replaceChildren();
-
-    const verdict = document.createElement("div");
-    verdict.className = `verdict verdict--${a.ok ? "ok" : "warn"}`;
-    verdict.textContent = a.ok ? "✓ Within limits" : "✗ Check this";
-    target.appendChild(verdict);
-
-    const summary = document.createElement("div");
-    summary.className = "verdict-summary";
-    summary.textContent = a.summary;
-    target.appendChild(summary);
-
-    const bar = buildTuneBar(a.details);
-    if (bar) target.appendChild(bar);
-
-    const metrics = document.createElement("div");
-    metrics.className = "metrics";
-    for (const [k, val] of Object.entries(a.details)) {
-      const row = document.createElement("div");
-      row.className = "metric";
-      const key = document.createElement("span");
-      key.className = "metric-key";
-      key.textContent = tuneLabel(k);
-      const value = document.createElement("span");
-      value.className = "metric-val";
-      value.textContent = tuneValue(k, val);
-      row.append(key, value);
-      metrics.appendChild(row);
-    }
-    target.appendChild(metrics);
-
-    if (a.notes.length > 0) {
-      const notes = document.createElement("ul");
-      notes.className = "tune-notes";
-      for (const note of a.notes) {
-        const li = document.createElement("li");
-        li.textContent = note;
-        notes.appendChild(li);
-      }
-      target.appendChild(notes);
-    }
-  } catch (err) {
-    target.replaceChildren(errorLine(errMsg(err)));
-  }
-}
-
-/** A labelled horizontal bar. `fill`/`marks` are 0..1 fractions of the track. */
-function makeBar(left: string, right: string, fill: number, zone: Zone, marks: Array<{ at: number; label: string }> = []): HTMLElement {
-  const wrap = document.createElement("div");
-  wrap.className = "bar-wrap";
-  const cap = document.createElement("div");
-  cap.className = "bar-caption";
-  const l = document.createElement("span");
-  l.textContent = left;
-  const r = document.createElement("span");
-  r.textContent = right;
-  cap.append(l, r);
-  wrap.appendChild(cap);
-  const bar = document.createElement("div");
-  bar.className = "bar";
-  const fillEl = document.createElement("div");
-  fillEl.className = `bar-fill${zone !== "ok" ? ` bar-fill--${zone}` : ""}`;
-  fillEl.style.width = `${clamp(fill, 0, 1) * 100}%`;
-  bar.appendChild(fillEl);
-  for (const m of marks) {
-    const mk = document.createElement("div");
-    mk.className = "bar-mark";
-    mk.style.left = `${clamp(m.at, 0, 1) * 100}%`;
-    mk.dataset.label = m.label;
-    bar.appendChild(mk);
-  }
-  wrap.appendChild(bar);
-  return wrap;
-}
-
-/** Pick a signature visual for whichever assessment this is. */
-function buildTuneBar(d: Record<string, number | string>): HTMLElement | null {
-  if ("utilizationPct" in d) {
-    const util = numOf(d.utilizationPct);
-    const zone: Zone = util >= 100 ? "warn" : util >= 80 ? "watch" : "ok";
-    return makeBar("Alternator load", `${util}%`, util / 100, zone, [
-      { at: 0.8, label: "80%" },
-      { at: 1, label: "100%" }
-    ]);
-  }
-  if ("newRpm" in d && "currentRpm" in d && "deltaPct" in d) {
-    const cur = numOf(d.currentRpm);
-    const nw = numOf(d.newRpm);
-    const scale = Math.max(cur, nw) * 1.2 || 1;
-    const zone: Zone = Math.abs(numOf(d.deltaPct)) >= 10 ? "watch" : "ok";
-    return makeBar("Cruise RPM", `${nw} rpm`, nw / scale, zone, [{ at: cur / scale, label: "now" }]);
-  }
-  if ("proposedCcMin" in d && "requiredCcMin" in d) {
-    const req = numOf(d.requiredCcMin);
-    const prop = numOf(d.proposedCcMin);
-    const frac = prop > 0 ? req / prop : 1;
-    const zone: Zone = frac > 1 ? "warn" : frac > 0.9 ? "watch" : "ok";
-    return makeBar("Injector demand at target", `${Math.round(frac * 100)}% of injector`, frac, zone, [{ at: 1, label: "max" }]);
-  }
-  return null;
-}
-
-function setupTune(): void {
-  $("btn-fd").addEventListener("click", () =>
-    renderAssessment("result-fd", () =>
-      assessFinalDriveChange({
-        speedMph: numFrom("fd-speed"),
-        tireDiameterIn: numFrom("fd-tire"),
-        topGearRatio: numFrom("fd-gear"),
-        currentFinalDrive: numFrom("fd-from"),
-        newFinalDrive: numFrom("fd-to")
-      })
-    )
-  );
-  $("btn-inj").addEventListener("click", () =>
-    renderAssessment("result-inj", () => {
-      const proposed = $<HTMLInputElement>("inj-size").value.trim();
-      return assessInjectorsForTarget({
-        targetHp: numFrom("inj-hp"),
-        cylinders: numFrom("inj-cyl"),
-        proposedCcMin: proposed === "" ? undefined : Number(proposed)
-      });
-    })
-  );
-  $("btn-load").addEventListener("click", () =>
-    renderAssessment("result-load", () =>
-      assessAddedElectricalLoad({
-        systemVoltage: numFrom("load-volt"),
-        existingLoadA: numFrom("load-existing"),
-        addedWatts: numFrom("load-watts"),
-        alternatorRatedA: numFrom("load-alt")
-      })
-    )
-  );
-}
 
 
 // ---- tabs / misc ------------------------------------------------------------
@@ -1006,10 +825,20 @@ function main(): void {
   history = new HistoryViewController("history-list", "history-detail", renderReport);
   history.setup('[data-tab="history"]', "btn-history-refresh", "btn-history-clear");
 
+  tune = new TuneAdvisorController(
+    "btn-fd",
+    "result-fd",
+    "btn-inj",
+    "result-inj",
+    "btn-load",
+    "result-load",
+    "inj-size"
+  );
+  tune.setup();
+
   setupTabs();
   setupPicker();
   setupUnits();
-  setupTune();
   void setupAbout();
   $("btn-connect").addEventListener("click", () => void connectSerial());
   $("btn-demo").addEventListener("click", () => void connectDemo());
