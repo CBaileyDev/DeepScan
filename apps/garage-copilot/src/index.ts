@@ -44,6 +44,7 @@ export {
 } from "./obd/vin-decode.js";
 export { decodeSupportedPids } from "./obd/supported-pids.js";
 export { convertUnit, type UnitSystem } from "./obd/units.js";
+export { describeDtcByMake, DTC_MEANINGS, MAKE_ALIASES, normalizeMake } from "./obd/dtc-meanings.js";
 
 // Diagnose
 export { runDiagnosticSession, type DiagnosticSnapshot, type SessionOptions } from "./diagnose/session.js";

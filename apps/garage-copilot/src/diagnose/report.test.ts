@@ -48,7 +48,7 @@ describe("buildReport", () => {
   it("converts live values to imperial when requested", () => {
     const snap = { ...snapshot, livePids: [{ pid: "05", label: "Engine Coolant Temperature", value: 100, unit: "C" }] };
     expect(buildReport(snap).text).toContain("Engine Coolant Temperature: 100 C");
-    expect(buildReport(snap, undefined, "imperial").text).toContain("Engine Coolant Temperature: 212 F");
+    expect(buildReport(snap, undefined, undefined, "imperial").text).toContain("Engine Coolant Temperature: 212 F");
   });
 
   it("renders DTCs with structural decode and hides unsupported monitors", () => {
@@ -56,5 +56,17 @@ describe("buildReport", () => {
     expect(report.text).toContain("P0301 — Powertrain, generic, ignition system or misfire");
     expect(report.text).not.toContain("EGR System"); // not-supported is hidden
     expect(report.text).toContain("Engine RPM: 812 rpm");
+  });
+
+  it("includes make-specific DTC meanings when make is provided", () => {
+    const report = buildReport(snapshot, undefined, "Honda");
+    expect(report.text).toContain("P0301"); // Still shows the code
+    expect(report.text).toContain("Powertrain"); // Still shows structural
+  });
+
+  it("extracts make from vehicle label for DTC lookup", () => {
+    const report = buildReport(snapshot, "2014 Honda Accord");
+    expect(report.text).toContain("P0301");
+    expect(report.text).toContain("Powertrain");
   });
 });

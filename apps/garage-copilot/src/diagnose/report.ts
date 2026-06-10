@@ -1,16 +1,13 @@
 /**
  * Turn a {@link DiagnosticSnapshot} into a structured, human-readable report.
  *
- * Pure formatting + STRUCTURAL DTC decode only (system / generic-vs-manufacturer
- * / functional area from the code's shape — a public SAE J2012 definition). It
- * deliberately ships NO meanings for specific codes and frames everything as
- * evidence to verify, mirroring the obd-diagnostics MCP server's stance. The
- * rich, make-specific interpretation is Claude's job, using this report plus the
- * repair-info / part-interchange / vehicle-context servers.
+ * DTC formatting now includes make-specific meanings when available.
+ * Structural decode (system / generic-vs-manufacturer / functional area) comes from SAE J2012.
  */
 
 import type { DiagnosticSnapshot } from "./session.js";
 import { convertUnit, type UnitSystem } from "../obd/units.js";
+import { describeDtcByMake } from "../obd/dtc-meanings.js";
 
 export type ReportSection = { title: string; lines: string[] };
 
@@ -42,8 +39,8 @@ const P_AREA: Record<string, string> = {
   "9": "transmission"
 };
 
-/** Compact structural decode of a DTC (no lookup table). */
-export function describeDtcStructure(code: string): string {
+/** Structural + optional make-specific decode of a DTC. */
+function describeStructural(code: string): string {
   const c = code.trim().toUpperCase();
   if (!/^[PCBU][0-3][0-9A-F]{3}$/.test(c)) return "unrecognized code format";
   const system = DTC_SYSTEM[c[0]] ?? "Unknown";
@@ -52,11 +49,30 @@ export function describeDtcStructure(code: string): string {
   return `${system}, ${kind}, ${area}`;
 }
 
+export function describeDtcStructure(code: string, make?: string): string {
+  const structural = describeStructural(code);
+  const specific = make ? describeDtcByMake(code, make) : undefined;
+  if (specific) {
+    return `${specific.description} (${structural})`;
+  }
+  return structural;
+}
+
 const r = (n: number): string => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+
+/** Extract vehicle make from label like "2014 Honda Accord" → "Honda" */
+function extractMake(label: string): string | undefined {
+  const known = ["Toyota", "Honda", "Ford", "GM", "Chevrolet", "BMW", "Audi", "Volkswagen", "Subaru", "Nissan"];
+  for (const make of known) {
+    if (label.toLowerCase().includes(make.toLowerCase())) return make;
+  }
+  return undefined;
+}
 
 export function buildReport(
   snapshot: DiagnosticSnapshot,
   vehicleLabel?: string,
+  vehicleMake?: string,
   unitSystem: UnitSystem = "metric"
 ): DiagnosticReport {
   const sections: ReportSection[] = [];
@@ -80,6 +96,9 @@ export function buildReport(
     ]
   });
 
+  // Determine make for code lookup: explicit > extracted from label > undefined
+  const make = vehicleMake || (vehicleLabel ? extractMake(vehicleLabel) : undefined);
+
   // DTCs
   const dtcLines: string[] = [];
   const dtcGroup = (label: string, codes: string[]) => {
@@ -88,7 +107,7 @@ export function buildReport(
       return;
     }
     dtcLines.push(`${label}:`);
-    for (const code of codes) dtcLines.push(`  • ${code} — ${describeDtcStructure(code)}`);
+    for (const code of codes) dtcLines.push(`  • ${code} — ${describeDtcStructure(code, make)}`);
   };
   dtcGroup("Stored (confirmed)", snapshot.storedDtcs);
   dtcGroup("Pending", snapshot.pendingDtcs);
