@@ -16,6 +16,10 @@ export {
   assessInjectorsForTarget,
   assessAddedElectricalLoad,
   PID_FORMULAS,
+  lookupAnyFormula,
+  registerCustomPids,
+  parseCustomPidJson,
+  exportCustomPidJson,
   decodeVin,
   convertUnit,
 } from '@deepscan/engine';
@@ -32,4 +36,5 @@ export type {
   Assessment,
   VinDecode,
   UnitSystem,
+  CustomPidDef,
 } from '@deepscan/engine';

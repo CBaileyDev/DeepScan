@@ -43,6 +43,29 @@ export {
   type VinValidation,
 } from './obd/vin-decode.js';
 export { decodeSupportedPids } from './obd/supported-pids.js';
+export {
+  decodeCalidResponse,
+  decodeCvnResponse,
+  decodeEcuNameResponse,
+  mergeVehicleInfo,
+  type VehicleInfo,
+} from './obd/mode09.js';
+export {
+  decodeMode06Response,
+  labelTid,
+  TID_LABELS,
+  type OnboardTestResult,
+} from './obd/mode06.js';
+export {
+  registerCustomPids,
+  clearCustomPids,
+  lookupAnyFormula,
+  decodeAnyPidData,
+  parseCustomPidJson,
+  exportCustomPidJson,
+  type CustomPidDef,
+  type CustomFormulaType,
+} from './obd/custom-pids.js';
 export { convertUnit, type UnitSystem } from './obd/units.js';
 export {
   describeDtcByMake,

@@ -1,0 +1,9 @@
+[
+  {
+    "pid": "22",
+    "label": "Manufacturer PID example",
+    "unit": "%",
+    "bytes": 1,
+    "formula": "percent_a"
+  }
+]

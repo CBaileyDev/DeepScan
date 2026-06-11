@@ -9,6 +9,8 @@
 
 import type { DecodedPid } from './pid-formulas.js';
 import type { MonitorStatus } from './dtc-decode.js';
+import type { VehicleInfo } from './mode09.js';
+import type { OnboardTestResult } from './mode06.js';
 
 /** Adapter/protocol identity reported after initialization. */
 export type ObdIdentity = {
@@ -36,6 +38,10 @@ export interface ObdReader {
   readVoltage(): Promise<number | undefined>;
   /** Mode 09 PID 02: the VIN, when the ECU supports it. Optional. */
   readVin?(): Promise<string | undefined>;
+  /** Mode 09: CALID, CVN, ECU name when supported. Optional. */
+  readVehicleInfo?(): Promise<VehicleInfo | undefined>;
+  /** Mode 06: onboard monitoring test results. Optional. */
+  readOnboardTests?(): Promise<OnboardTestResult[]>;
   /** Mode 01 PID 00/20/…: the live PIDs this ECU supports. Optional. */
   readSupportedPids?(): Promise<string[]>;
   /** Release the underlying transport. */

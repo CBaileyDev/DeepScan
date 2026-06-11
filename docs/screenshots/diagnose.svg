@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540">
+  <rect width="960" height="540" fill="#07090d"/>
+  <rect x="0" y="0" width="960" height="48" fill="#11151c"/>
+  <text x="24" y="30" fill="#eef2f8" font-family="system-ui,sans-serif" font-size="16" font-weight="600">DeepScan</text>
+  <rect x="720" y="12" width="120" height="24" rx="12" fill="#3ad17a33" stroke="#3ad17a"/>
+  <text x="732" y="28" fill="#3ad17a" font-family="system-ui" font-size="11">Connected · CAN</text>
+  <rect x="24" y="64" width="80" height="28" rx="6" fill="#ff7a18"/>
+  <text x="36" y="82" fill="#07090d" font-family="system-ui" font-size="12" font-weight="600">Diagnose</text>
+  <text x="120" y="82" fill="#93a0b4" font-family="system-ui" font-size="12">Live Monitor</text>
+  <text x="230" y="82" fill="#93a0b4" font-family="system-ui" font-size="12">Tune Advisor</text>
+  <text x="36" y="120" fill="#eef2f8" font-family="system-ui" font-size="20" font-weight="600">Diagnostic Scan</text>
+  <rect x="780" y="108" width="156" height="32" rx="8" fill="#ff7a18"/>
+  <text x="800" y="129" fill="#07090d" font-family="system-ui" font-size="12" font-weight="600">Run Diagnostic Scan</text>
+  <rect x="24" y="148" width="912" height="360" rx="12" fill="#161c25" stroke="#232c39"/>
+  <circle cx="48" cy="188" r="8" fill="#ff5142"/>
+  <text x="64" y="193" fill="#ff5142" font-family="system-ui" font-size="14" font-weight="600">Demo vehicle  MIL ON, 2 confirmed DTCs reported</text>
+  <text x="40" y="230" fill="#eef2f8" font-family="system-ui" font-size="13" font-weight="600">Overview</text>
+  <text x="40" y="252" fill="#93a0b4" font-family="ui-monospace,monospace" font-size="12">VIN: 1HGBH41JXMN109186 · CALID: CALID123</text>
+  <text x="40" y="272" fill="#93a0b4" font-family="ui-monospace,monospace" font-size="12">MIL: ON · ECU-reported DTC count: 2</text>
+  <text x="40" y="310" fill="#eef2f8" font-family="system-ui" font-size="13" font-weight="600">Diagnostic Trouble Codes</text>
+  <rect x="40" y="322" width="56" height="20" rx="4" fill="#ff514233"/>
+  <text x="48" y="336" fill="#ff7a18" font-family="ui-monospace" font-size="11">P0301</text>
+  <text x="104" y="336" fill="#93a0b4" font-family="system-ui" font-size="12">Powertrain, generic, ignition / misfire</text>
+  <rect x="40" y="350" width="56" height="20" rx="4" fill="#ff514233"/>
+  <text x="48" y="364" fill="#ff7a18" font-family="ui-monospace" font-size="11">P0420</text>
+  <text x="104" y="364" fill="#93a0b4" font-family="system-ui" font-size="12">Powertrain, generic, catalyst efficiency</text>
+</svg>

@@ -56,6 +56,8 @@ const PID = {
   LONG_TERM_FUEL_TRIM_B2: '09',
   COOLANT_TEMP: '05',
   CONTROL_MODULE_VOLTAGE: '42',
+  O2_SENSOR_1: '14',
+  O2_SENSOR_2: '15',
 } as const;
 
 /** Heuristic thresholds. Conservative and documented; tune in one place. */
@@ -63,6 +65,8 @@ const FUEL_TRIM_WATCH_PCT = 10; // combined STFT+LTFT magnitude → "watch"
 const FUEL_TRIM_WARN_PCT = 25; // combined STFT+LTFT magnitude → "warn"
 const COOLANT_OVERHEAT_C = 110; // sustained peak above this → possible overheat
 const CHARGING_MIN_V = 13.0; // average below this with engine running → weak charge
+const O2_LEAN_V = 0.1; // sustained below → possible lean condition
+const O2_RICH_V = 0.85; // sustained above → possible rich condition
 
 const round = (n: number): number => Math.round(n * 100) / 100;
 
@@ -183,6 +187,30 @@ export function analyzeTrends(samples: TimedSample[]): TrendReport {
       parameter: 'Charging voltage',
       message: `Averaged ${volt.avg} V — below a healthy ~13.5–14.5 V charging range. Check alternator/belt/battery.`,
     });
+  }
+
+  // O2 sensor voltage heuristics (14/15) when engine is running.
+  if (rpm && rpm.avg > 400) {
+    for (const [pid, label] of [
+      [PID.O2_SENSOR_1, 'O2 sensor 1'],
+      [PID.O2_SENSOR_2, 'O2 sensor 2'],
+    ] as const) {
+      const o2 = byPid.get(pid);
+      if (!o2) continue;
+      if (o2.avg < O2_LEAN_V) {
+        flags.push({
+          severity: 'watch',
+          parameter: label,
+          message: `Averaged ${o2.avg} V — unusually low. May indicate a lean condition or a failing sensor.`,
+        });
+      } else if (o2.avg > O2_RICH_V) {
+        flags.push({
+          severity: 'watch',
+          parameter: label,
+          message: `Averaged ${o2.avg} V — unusually high. May indicate a rich condition or a stuck sensor.`,
+        });
+      }
+    }
   }
 
   return { stats, flags, caveat: TREND_CAVEAT };

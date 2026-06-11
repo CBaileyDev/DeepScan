@@ -13,6 +13,8 @@
 import type { ObdReader, ObdIdentity } from '../obd/reader.js';
 import type { DecodedPid } from '../obd/pid-formulas.js';
 import type { MonitorStatus, ReadinessMonitor } from '../obd/dtc-decode.js';
+import type { VehicleInfo } from '../obd/mode09.js';
+import type { OnboardTestResult } from '../obd/mode06.js';
 
 /** Everything gathered in one diagnostic pass. Pure evidence, no diagnosis. */
 export type DiagnosticSnapshot = {
@@ -31,6 +33,10 @@ export type DiagnosticSnapshot = {
   voltage?: number;
   /** VIN read over Mode 09, when the ECU supports it. */
   vin?: string;
+  /** Mode 09 CALID/CVN/ECU name when supported. */
+  vehicleInfo?: VehicleInfo;
+  /** Mode 06 onboard monitoring test results when supported. */
+  onboardTests?: OnboardTestResult[];
   /** Non-fatal problems encountered while reading (e.g. an unsupported PID). */
   warnings: string[];
 };
@@ -121,6 +127,12 @@ export async function runDiagnosticSession(
   const vin = reader.readVin
     ? await safe(() => reader.readVin!(), warnings, 'read VIN (mode 09)', undefined)
     : undefined;
+  const vehicleInfo = reader.readVehicleInfo
+    ? await safe(() => reader.readVehicleInfo!(), warnings, 'read vehicle info (mode 09)', undefined)
+    : undefined;
+  const onboardTests = reader.readOnboardTests
+    ? await safe(() => reader.readOnboardTests!(), warnings, 'read onboard tests (mode 06)', [])
+    : undefined;
 
   return {
     capturedAt: now().toISOString(),
@@ -136,6 +148,8 @@ export async function runDiagnosticSession(
     livePids,
     voltage,
     vin,
+    vehicleInfo,
+    onboardTests: onboardTests && onboardTests.length > 0 ? onboardTests : undefined,
     warnings,
   };
 }

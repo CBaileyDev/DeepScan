@@ -14,7 +14,16 @@
 
 import type { ObdTransport } from './transport.js';
 import type { ObdIdentity, ObdReader } from './reader.js';
-import { decodePidData, normalizePid, type DecodedPid } from './pid-formulas.js';
+import { normalizePid, type DecodedPid } from './pid-formulas.js';
+import { decodeAnyPidData } from './custom-pids.js';
+import {
+  decodeCalidResponse,
+  decodeCvnResponse,
+  decodeEcuNameResponse,
+  mergeVehicleInfo,
+  type VehicleInfo,
+} from './mode09.js';
+import { decodeMode06Response, type OnboardTestResult } from './mode06.js';
 import {
   decodeDtcResponse,
   decodeMonitorStatus,
@@ -38,6 +47,11 @@ export class ObdError extends Error {
 export type Elm327Options = {
   /** Per-command response timeout in milliseconds (default 5000). */
   timeoutMs?: number;
+  /**
+   * OBD protocol selection for ATSP. `auto` (default) uses ATSP0; a number sets
+   * ATSP{n} (e.g. 6 = ISO 15765-4 CAN 11/500).
+   */
+  protocol?: 'auto' | number;
   /**
    * Called for every completed command with the command sent and the cleaned
    * response lines. Useful for a live "adapter log" when bringing up hardware.
@@ -93,6 +107,7 @@ export function likelyCanDtcResponse(lines: string[], service: number): boolean 
 
 export class Elm327Client implements ObdReader {
   private readonly timeoutMs: number;
+  private readonly protocol: 'auto' | number;
   private readonly onTransaction?: (command: string, response: string[]) => void;
   /** True once init detects a CAN protocol (DTC responses carry a count byte). */
   private canMode = false;
@@ -105,6 +120,7 @@ export class Elm327Client implements ObdReader {
     options: Elm327Options = {}
   ) {
     this.timeoutMs = options.timeoutMs ?? 5000;
+    this.protocol = options.protocol ?? 'auto';
     this.onTransaction = options.onTransaction;
   }
 
@@ -182,7 +198,9 @@ export class Elm327Client implements ObdReader {
     await this.send('ATL0'); // linefeeds off
     await this.send('ATS0'); // spaces off
     await this.send('ATH0'); // headers off
-    await this.send('ATSP0'); // automatic protocol selection
+    const atsp =
+      this.protocol === 'auto' ? 'ATSP0' : `ATSP${Math.max(0, Math.min(9, this.protocol))}`;
+    await this.send(atsp);
     // The first real request forces protocol negotiation, which can take several
     // seconds on some vehicles ("SEARCHING..."), so give it a generous timeout.
     // (The AT setup commands above use the instance timeout, so a dead adapter
@@ -274,7 +292,7 @@ export class Elm327Client implements ObdReader {
     if (this.isNoData(lines)) return undefined;
     const data = this.extractPidData(this.hexLines(lines), 0x41, code);
     if (!data) return undefined;
-    return decodePidData(code, data);
+    return decodeAnyPidData(code, data);
   }
 
   async readVoltage(): Promise<number | undefined> {
@@ -332,6 +350,41 @@ export class Elm327Client implements ObdReader {
       // VIN (mode 09) is not supported by every ECU; treat as unavailable.
       return undefined;
     }
+  }
+
+  async readVehicleInfo(): Promise<VehicleInfo | undefined> {
+    const parts: Partial<VehicleInfo> = {};
+    for (const [cmd, decode, key] of [
+      ['0904', decodeCalidResponse, 'calid'],
+      ['0906', decodeCvnResponse, 'cvn'],
+      ['090A', decodeEcuNameResponse, 'ecuName'],
+    ] as const) {
+      try {
+        const lines = await this.send(cmd);
+        if (this.isNoData(lines)) continue;
+        const value = decode(lines);
+        if (value) parts[key] = value;
+      } catch {
+        /* optional field */
+      }
+    }
+    return mergeVehicleInfo(parts);
+  }
+
+  async readOnboardTests(): Promise<OnboardTestResult[]> {
+    const results: OnboardTestResult[] = [];
+    // Walk common Test IDs; ECUs return NO DATA for unsupported TIDs.
+    for (let tid = 0x01; tid <= 0x0b; tid++) {
+      const tidHex = tid.toString(16).toUpperCase().padStart(2, '0');
+      try {
+        const lines = await this.send(`06${tidHex}`);
+        if (this.isNoData(lines)) continue;
+        results.push(...decodeMode06Response(lines));
+      } catch {
+        /* skip unsupported TID */
+      }
+    }
+    return results;
   }
 
   async close(): Promise<void> {

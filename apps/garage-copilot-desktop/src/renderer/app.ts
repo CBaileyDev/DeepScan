@@ -17,6 +17,9 @@ import {
   assessInjectorsForTarget,
   assessAddedElectricalLoad,
   PID_FORMULAS,
+  lookupAnyFormula,
+  registerCustomPids,
+  parseCustomPidJson,
   convertUnit,
   decodeVin,
   type ObdReader,
@@ -26,6 +29,7 @@ import {
   type UnitSystem,
   type VinDecode,
   type DiagnosticSnapshot,
+  type CustomPidDef,
 } from './core.js';
 import { WebSerialTransport } from './web-serial.js';
 import { toCsv, lineSeverityClass, dtcSearchUrl, dtcCodeInLine, boundedPush } from './format.js';
@@ -49,6 +53,10 @@ const show = (el: HTMLElement, visible: boolean): void => {
 type Connection = { client: ObdReader; label: string; demo: boolean; identity: ObdIdentity };
 let conn: Connection | null = null;
 let connectInFlight = false;
+let lastSerialPort: SerialPort | null = null;
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 5;
+const CUSTOM_PIDS_KEY = 'deepscan-custom-pids';
 let unitSystem: UnitSystem = 'metric';
 let lastSnapshot: DiagnosticSnapshot | null = null;
 let lastLabel: string | undefined;
@@ -163,8 +171,14 @@ const PID_PRIORITY = [
   '46',
   '5C',
   '33',
+  '14',
+  '15',
+  '3C',
+  '3D',
+  '44',
+  '4B',
 ];
-const MONITOR_PID_CAP = 16;
+const MONITOR_PID_CAP = 24;
 let monitorPids: string[] = DEFAULT_LIVE_PIDS;
 const SPARK_MAX = 60;
 // Cap the live sample buffer (~8 min at 8 PIDs/s) so memory and per-tick trend
@@ -235,7 +249,7 @@ async function discoverMonitorPids(client: ObdReader): Promise<string[]> {
   if (!client.readSupportedPids) return DEFAULT_LIVE_PIDS;
   try {
     const supported = await client.readSupportedPids();
-    const decodable = supported.filter((p) => p in PID_FORMULAS);
+    const decodable = supported.filter((p) => lookupAnyFormula(p));
     if (decodable.length === 0) return DEFAULT_LIVE_PIDS;
     const ordered = [
       ...PID_PRIORITY.filter((p) => decodable.includes(p)),
@@ -247,7 +261,18 @@ async function discoverMonitorPids(client: ObdReader): Promise<string[]> {
   }
 }
 
-async function connectSerial(): Promise<void> {
+function protocolFromUi(): 'auto' | number {
+  const raw = $<HTMLSelectElement>('protocol').value;
+  if (raw === 'auto') return 'auto';
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 'auto';
+}
+
+function autoReconnectEnabled(): boolean {
+  return $<HTMLInputElement>('auto-reconnect').checked;
+}
+
+async function connectSerial(existingPort?: SerialPort): Promise<void> {
   if (connectInFlight) {
     setStatus('Connection in progress — please wait.', 'connecting');
     return;
@@ -257,27 +282,48 @@ async function connectSerial(): Promise<void> {
     return;
   }
   connectInFlight = true;
-  setStatus('Select your adapter…', 'connecting');
+  setStatus(existingPort ? 'Reconnecting…' : 'Select your adapter…', 'connecting');
   try {
-    const port = await navigator.serial.requestPort();
+    const port = existingPort ?? (await navigator.serial.requestPort());
+    lastSerialPort = port;
     const baudRate = Number($<HTMLSelectElement>('baud').value) || 38400;
     const transport = new WebSerialTransport(port, {
       baudRate,
       onError: () => void handleTransportLost(),
     });
     await transport.start();
-    adapterLog.length = 0;
+    if (!existingPort) adapterLog.length = 0;
     // 4s per command keeps live polling responsive and fails fast on a dead
     // adapter; initialize() still gives protocol negotiation a longer window.
     await activate(
-      new Elm327Client(transport, { onTransaction: logTransaction, timeoutMs: 4000 }),
+      new Elm327Client(transport, {
+        onTransaction: logTransaction,
+        timeoutMs: 4000,
+        protocol: protocolFromUi(),
+      }),
       'OBD-II adapter',
       false
     );
+    reconnectAttempts = 0;
   } catch (err) {
     setStatus(`No adapter selected (${errMsg(err)})`, 'off');
   } finally {
     connectInFlight = false;
+  }
+}
+
+async function tryAutoReconnect(): Promise<void> {
+  if (!autoReconnectEnabled() || !lastSerialPort || reconnectAttempts >= MAX_RECONNECT_ATTEMPTS)
+    return;
+  reconnectAttempts++;
+  const delayMs = Math.min(30_000, 1000 * 2 ** (reconnectAttempts - 1));
+  setStatus(`Adapter lost — reconnecting in ${Math.round(delayMs / 1000)}s…`, 'connecting');
+  await new Promise((r) => setTimeout(r, delayMs));
+  if (conn) return;
+  try {
+    await connectSerial(lastSerialPort);
+  } catch {
+    void tryAutoReconnect();
   }
 }
 
@@ -306,6 +352,8 @@ async function disconnect(): Promise<void> {
   }
   conn = null;
   connectInFlight = false;
+  lastSerialPort = null;
+  reconnectAttempts = 0;
   show($('btn-live-export'), false);
   setStatus('Disconnected', 'off');
   setConnectedUi(false);
@@ -320,16 +368,21 @@ async function handleTransportLost(): Promise<void> {
   if (!conn) return; // already disconnected
   stopLive();
   const client = conn.client;
+  const wasDemo = conn.demo;
   conn = null;
   connectInFlight = false;
   show($('btn-live-export'), false);
-  setStatus('Adapter disconnected — check the cable, then reconnect.', 'off');
   setConnectedUi(false);
   try {
     await client.close();
   } catch {
     /* ignore */
   }
+  if (!wasDemo && autoReconnectEnabled() && lastSerialPort) {
+    void tryAutoReconnect();
+    return;
+  }
+  setStatus('Adapter disconnected — check the cable, then reconnect.', 'off');
 }
 
 // ---- serial picker modal ----------------------------------------------------
@@ -511,7 +564,19 @@ function renderReport(
     downloadText(fullText, 'deepscan-report.md', 'text/markdown')
   );
 
-  actions.append(copy, save);
+  const saveJson = document.createElement('button');
+  saveJson.className = 'ghost';
+  saveJson.textContent = 'Save JSON';
+  saveJson.addEventListener('click', () => {
+    if (!lastSnapshot) return;
+    downloadText(
+      JSON.stringify(lastSnapshot, null, 2),
+      'deepscan-snapshot.json',
+      'application/json'
+    );
+  });
+
+  actions.append(copy, save, saveJson);
   out.appendChild(actions);
 }
 
@@ -1187,11 +1252,18 @@ function setupHistory(): void {
     .querySelector('[data-tab="history"]')
     ?.addEventListener('click', () => void loadHistory());
   $('btn-history-refresh').addEventListener('click', () => void loadHistory());
+  $('btn-history-export').addEventListener('click', () => void exportHistoryJson());
   $('btn-history-clear').addEventListener('click', async () => {
     await window.deepscan.history.clear();
     await loadHistory();
     $('history-detail').replaceChildren();
   });
+}
+
+async function exportHistoryJson(): Promise<void> {
+  if (!window.deepscan) return;
+  const records = await window.deepscan.history.list();
+  downloadText(JSON.stringify(records, null, 2), 'deepscan-history.json', 'application/json');
 }
 
 async function loadHistory(): Promise<void> {
@@ -1310,15 +1382,81 @@ function milLampSvg(): SVGElement {
   return svg;
 }
 
+// ---- custom PIDs ------------------------------------------------------------
+function loadCustomPidsFromStorage(): void {
+  try {
+    const raw = localStorage.getItem(CUSTOM_PIDS_KEY);
+    if (raw) registerCustomPids(parseCustomPidJson(raw));
+  } catch {
+    /* ignore corrupt storage */
+  }
+  renderCustomPidList();
+}
+
+function renderCustomPidList(): void {
+  const list = $('custom-pid-list');
+  list.replaceChildren();
+  const defs = parseCustomPidJson(localStorage.getItem(CUSTOM_PIDS_KEY) ?? '[]');
+  if (defs.length === 0) {
+    const li = document.createElement('li');
+    li.className = 'muted';
+    li.textContent = 'No custom PIDs yet.';
+    list.appendChild(li);
+    return;
+  }
+  for (const def of defs) {
+    const li = document.createElement('li');
+    li.textContent = `${def.pid} — ${def.label}${def.unit ? ` (${def.unit})` : ''}`;
+    const rm = document.createElement('button');
+    rm.className = 'ghost';
+    rm.textContent = 'Remove';
+    rm.addEventListener('click', () => {
+      const next = defs.filter((d) => d.pid.toUpperCase() !== def.pid.toUpperCase());
+      localStorage.setItem(CUSTOM_PIDS_KEY, JSON.stringify(next));
+      registerCustomPids([]);
+      registerCustomPids(next);
+      renderCustomPidList();
+    });
+    li.append(rm);
+    list.appendChild(li);
+  }
+}
+
+function setupCustomPids(): void {
+  loadCustomPidsFromStorage();
+  $('btn-custom-add').addEventListener('click', () => {
+    const def: CustomPidDef = {
+      pid: $<HTMLInputElement>('custom-pid').value,
+      label: $<HTMLInputElement>('custom-label').value,
+      unit: $<HTMLInputElement>('custom-unit').value || undefined,
+      bytes: $<HTMLSelectElement>('custom-formula').value.includes('_ab') ? 2 : 1,
+      formula: $<HTMLSelectElement>('custom-formula').value as CustomPidDef['formula'],
+    };
+    const existing = parseCustomPidJson(localStorage.getItem(CUSTOM_PIDS_KEY) ?? '[]');
+    const pid = def.pid.trim().toUpperCase();
+    if (!pid || !def.label.trim()) return;
+    const next = [...existing.filter((d) => d.pid.toUpperCase() !== pid), { ...def, pid }];
+    localStorage.setItem(CUSTOM_PIDS_KEY, JSON.stringify(next));
+    registerCustomPids(next);
+    renderCustomPidList();
+    $<HTMLInputElement>('custom-pid').value = '';
+    $<HTMLInputElement>('custom-label').value = '';
+  });
+}
+
 // ---- boot -------------------------------------------------------------------
 function main(): void {
   setupTabs();
   setupPicker();
   setupUnits();
   setupHistory();
+  setupCustomPids();
   setupTune();
   setupVin();
   void setupAbout();
+  $('btn-log-export').addEventListener('click', () =>
+    downloadText(adapterLog.join('\n'), 'deepscan-adapter-log.txt', 'text/plain')
+  );
   $('btn-connect').addEventListener('click', () => void connectSerial());
   $('btn-demo').addEventListener('click', () => void connectDemo());
   $('btn-disconnect').addEventListener('click', () => void disconnect());

@@ -2,10 +2,23 @@
 
 Professional read-only automotive diagnostics: a cross-platform desktop app and command-line tools for OBD-II vehicle scanning. Plug an ELM327 adapter into your car's OBD-II port and diagnose trouble codes, monitor live parameters, and validate tune changes — entirely offline, without modifying your vehicle.
 
-- **Diagnose** — scan trouble codes, check readiness monitors, view live snapshot
-- **Monitor** — stream live parameters with trend analysis and health flags
+- **Diagnose** — MIL status, DTCs, I/M readiness, Mode 06 onboard tests, Mode 09 VIN/CALID/CVN, live snapshot
+- **Monitor** — 60+ standard PIDs, custom PID formulas, radial gauges, sparklines, CSV export
 - **Tune Advisor** — validate gearing, injector, and electrical load changes before flashing
+- **History** — scan timeline with JSON export (desktop)
 - **Read-only by design** — no code clearing, ECU writing, or active tests
+
+## Screenshots
+
+| Diagnose | Live Monitor | Tune Advisor |
+|----------|--------------|--------------|
+| ![Diagnostic scan report](docs/screenshots/diagnose.svg) | ![Live gauges and trends](docs/screenshots/live-monitor.svg) | ![Tune planning tools](docs/screenshots/tune-advisor.svg) |
+
+> Run **Demo mode** in the app to explore without hardware. For real adapters, [STN-based dongles (OBDLink)](https://www.scantool.net/) are more reliable than ELM327 clones; Bluetooth/WiFi adapters work when paired as a system serial port.
+
+## Download
+
+Pre-built desktop binaries: see [RELEASES.md](./RELEASES.md). Build locally with `npm run dist` in `apps/garage-copilot-desktop`.
 
 ## Quick Start
 
@@ -57,7 +70,7 @@ The core diagnostic library: ELM327 driver, SAE J1979 OBD-II decoder, trend anal
 ```bash
 cd apps/garage-copilot
 npm install && npm run build
-npm test                  # 134 unit tests (engine + desktop)
+npm test                  # 150+ unit tests (engine + desktop)
 node dist/cli.js diagnose --vehicle "2014 Subaru Forester"
 ```
 
@@ -114,7 +127,7 @@ npm start                 # Builds engine, then launches Electron dev server
 
 ### Engine
 
-- **OBD bridge** (`src/obd/`): ELM327 protocol driver, PID decoders, DTC decode, VIN validation, transport abstraction
+- **OBD bridge** (`src/obd/`): ELM327 driver, 60+ Mode-01 PIDs, custom PID registry, Mode 06/09, DTC decode, transport abstraction
 - **Diagnose** (`src/diagnose/`): One-pass diagnostic snapshot → structured report
 - **Monitor** (`src/monitor/`): PID time-series recorder → trend stats + health flags
 - **Tune Advisor** (`src/tune/`): Planning math for gearing, injectors, electrical load
@@ -132,7 +145,7 @@ Both are written in TypeScript with strict mode, fully tested, and hardened agai
 - **Read-only by design**: No code clearing, ECU writing, or active tests anywhere in the codebase.
 - **Evidence, not diagnosis**: Reports are caveated; no manufacturer-specific DTC meanings are invented.
 - **Tune = advisory math only**: The advisor validates the _consequence_ of a proposed change; it does not flash anything.
-- **Clone adapters vary**: ELM327 clones are unreliable; STN-based dongles (OBDLink SX/MX+) are recommended.
+- **Clone adapters vary**: ELM327 clones are unreliable; STN-based dongles (OBDLink SX/MX+) are recommended. Use **Protocol: Auto** first; manual CAN/KWP override is available if negotiation fails.
 
 Modifying emissions-related calibration on a road vehicle is regulated (U.S. Clean Air Act, etc.). Keep performance changes to off-road and track use only.
 

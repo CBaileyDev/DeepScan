@@ -39,6 +39,12 @@ export const DEMO_VEHICLE: ReplayScript = {
 
   // VIN (Mode 09 PID 02): ASCII for "1HGBH41JXMN109186" after the 49 02 01 header.
   '0902': '49 02 01 31 48 47 42 48 34 31 4A 58 4D 4E 31 30 39 31 38 36',
+  // Mode 09 CALID / CVN / ECU name (illustrative).
+  '0904': '49 04 01 43 41 4C 49 44 31 32 33',
+  '0906': '49 06 01 A1 B2 C3 D4',
+  '090A': '49 0A 01 50 43 4D 20 45 43 55',
+  // Mode 06: catalyst low threshold test (TID 03) — value within limits.
+  '0603': '46 03 11 01 2C 00 64 02 58',
 
   // --- Live PIDs (idle) --------------------------------------------------
   '010C': '41 0C 0C B0', // RPM   = (256*12+176)/4 = 812 rpm

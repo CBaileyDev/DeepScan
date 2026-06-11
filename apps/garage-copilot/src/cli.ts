@@ -13,8 +13,9 @@
  * replay adapter. With no --port, --demo is assumed so the tool always runs.
  */
 
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import { parseCustomPidJson, registerCustomPids } from './obd/custom-pids.js';
 import { Elm327Client } from './obd/elm327.js';
 import { ReplayTransport } from './obd/replay-transport.js';
 import { DEMO_VEHICLE } from './obd/recordings.js';
@@ -65,6 +66,12 @@ function num(flags: Flags['flags'], key: string): number {
   return n;
 }
 
+function loadCustomPids(flags: Flags['flags']): void {
+  const path = typeof flags['custom-pids'] === 'string' ? flags['custom-pids'] : undefined;
+  if (!path || !existsSync(path)) return;
+  registerCustomPids(parseCustomPidJson(readFileSync(path, 'utf8')));
+}
+
 async function makeReader(flags: Flags['flags']): Promise<{ reader: ObdReader; demo: boolean }> {
   const port = typeof flags.port === 'string' ? flags.port : undefined;
   // --sim uses the time-varying simulator (nice for `monitor`); otherwise the
@@ -103,20 +110,34 @@ function findRepoRoot(start: string): string {
   return start;
 }
 
+function writeOut(flags: Flags['flags'], content: string, defaultName: string): void {
+  const out = typeof flags.out === 'string' ? flags.out : undefined;
+  if (out) {
+    writeFileSync(out, content, 'utf8');
+    console.log(`Wrote ${out}`);
+  } else {
+    console.log(content);
+  }
+}
+
 async function cmdDiagnose(f: Flags): Promise<void> {
+  loadCustomPids(f.flags);
   const { reader, demo } = await makeReader(f.flags);
   try {
     const snapshot = await runDiagnosticSession(reader);
     const label = typeof f.flags.vehicle === 'string' ? f.flags.vehicle : undefined;
     const report = buildReport(snapshot, label);
-    if (demo) console.log('(offline demo — no adapter connected; pass --port for real hardware)\n');
-    console.log(report.text);
+    const prefix = demo
+      ? '(offline demo — no adapter connected; pass --port for real hardware)\n\n'
+      : '';
+    writeOut(f.flags, prefix + report.text, 'deepscan-report.md');
   } finally {
     await reader.close();
   }
 }
 
 async function cmdMonitor(f: Flags): Promise<void> {
+  loadCustomPids(f.flags);
   const { reader, demo } = await makeReader(f.flags);
   try {
     const rounds = f.flags.rounds !== undefined ? num(f.flags, 'rounds') : demo ? 5 : 30;
@@ -132,22 +153,24 @@ async function cmdMonitor(f: Flags): Promise<void> {
     await reader.initialize();
     const series = await recordSeries(reader, { pids, rounds, intervalMs });
     const report = analyzeTrends(series);
+    const lines: string[] = [];
     if (demo)
-      console.log(
-        '(offline demo — no adapter connected; pass --port for real hardware, or --sim for moving data)\n'
+      lines.push(
+        '(offline demo — no adapter connected; pass --port for real hardware, or --sim for moving data)',
+        ''
       );
-    console.log('# Monitor — per-parameter trends');
+    lines.push('# Monitor — per-parameter trends');
     for (const s of report.stats) {
-      console.log(
+      lines.push(
         `${s.label} [${s.pid}]: avg ${s.avg}${s.unit ? ' ' + s.unit : ''} (min ${s.min}, max ${s.max}, slope ${s.slopePerMinute}/min, n=${s.count})`
       );
     }
-    console.log('');
-    console.log('# Flags');
-    if (report.flags.length === 0) console.log('None.');
+    lines.push('', '# Flags');
+    if (report.flags.length === 0) lines.push('None.');
     for (const flag of report.flags)
-      console.log(`[${flag.severity}] ${flag.parameter}: ${flag.message}`);
-    console.log(`\n${report.caveat}`);
+      lines.push(`[${flag.severity}] ${flag.parameter}: ${flag.message}`);
+    lines.push('', report.caveat);
+    writeOut(f.flags, lines.join('\n'), 'deepscan-monitor.txt');
   } finally {
     await reader.close();
   }
@@ -221,8 +244,8 @@ function usage(): void {
   console.log(`deepscan <command> [flags]
 
 Commands:
-  diagnose    [--port PATH | --demo | --sim] [--baud N] [--vehicle "label"]
-  monitor     [--port PATH | --demo | --sim] [--rounds N] [--interval MS] [--pids 0C,05,...]
+  diagnose    [--port PATH | --demo | --sim] [--baud N] [--vehicle "label"] [--out FILE] [--custom-pids FILE]
+  monitor     [--port PATH | --demo | --sim] [--rounds N] [--interval MS] [--pids 0C,05,...] [--out FILE] [--custom-pids FILE]
   advise      final-drive --speed --tire --gear --from --to
               injectors   --hp --cylinders [--bsfc --duty --density --injector]
               load        --voltage --existing --watts --alt

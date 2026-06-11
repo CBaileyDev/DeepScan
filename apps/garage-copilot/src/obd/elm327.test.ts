@@ -51,6 +51,20 @@ describe('Elm327Client against the demo vehicle', () => {
     expect(await client.readVoltage()).toBe(14.2);
   });
 
+  it('reads Mode 09 vehicle info fields', async () => {
+    const { client } = demoClient();
+    const info = await client.readVehicleInfo();
+    expect(info?.calid).toBe('CALID123');
+    expect(info?.cvn).toBe('A1B2C3D4');
+    expect(info?.ecuName).toBe('PCM ECU');
+  });
+
+  it('reads Mode 06 onboard test results', async () => {
+    const { client } = demoClient();
+    const tests = await client.readOnboardTests();
+    expect(tests.some((t) => t.tid === '03')).toBe(true);
+  });
+
   it("serializes concurrent commands so responses don't interleave (half-duplex)", async () => {
     const { client } = demoClient();
     // Fired together; the internal queue must run them one-at-a-time in order so

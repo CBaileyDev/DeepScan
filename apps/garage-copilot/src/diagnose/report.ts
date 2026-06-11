@@ -12,6 +12,7 @@
 import type { DiagnosticSnapshot } from './session.js';
 import { convertUnit, type UnitSystem } from '../obd/units.js';
 import { describeDtcByMake } from '../obd/dtc-meanings.js';
+import { labelTid } from '../obd/mode06.js';
 
 export type ReportSection = { title: string; lines: string[] };
 
@@ -95,6 +96,9 @@ export function buildReport(
     lines: [
       `Adapter: ${snapshot.identity.description} (${snapshot.identity.protocol})`,
       ...(snapshot.vin ? [`VIN: ${snapshot.vin}`] : []),
+      ...(snapshot.vehicleInfo?.calid ? [`CALID: ${snapshot.vehicleInfo.calid}`] : []),
+      ...(snapshot.vehicleInfo?.cvn ? [`CVN: ${snapshot.vehicleInfo.cvn}`] : []),
+      ...(snapshot.vehicleInfo?.ecuName ? [`ECU: ${snapshot.vehicleInfo.ecuName}`] : []),
       `Engine type: ${snapshot.ignitionType}-ignition`,
       `MIL (check-engine light): ${snapshot.milOn ? 'ON' : 'off'}`,
       `ECU-reported DTC count: ${snapshot.reportedDtcCount}`,
@@ -139,6 +143,19 @@ export function buildReport(
     title: 'I/M Readiness (evidence only — does not predict an inspection result)',
     lines: readinessLines.length > 0 ? readinessLines : ['No supported monitors reported.'],
   });
+
+  // Mode 06 onboard tests
+  if (snapshot.onboardTests && snapshot.onboardTests.length > 0) {
+    const testLines = snapshot.onboardTests.map((t) => {
+      const status =
+        t.status === 'pass' ? '✓ pass' : t.status === 'fail' ? '✗ fail' : '? unknown';
+      return `${status} · ${labelTid(t.tid)} (CID ${t.cid}): value ${t.value}, limits ${t.min}–${t.max}`;
+    });
+    sections.push({
+      title: 'Onboard Monitoring Tests (Mode 06 — evidence only)',
+      lines: testLines,
+    });
+  }
 
   // Live data (converted to the chosen display units)
   const liveLines = snapshot.livePids.map((p) => {

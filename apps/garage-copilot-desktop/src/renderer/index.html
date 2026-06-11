@@ -42,6 +42,20 @@
             <option value="115200">115200 baud</option>
             <option value="500000">500000 baud</option>
           </select>
+          <select id="protocol" class="baud" title="OBD protocol (auto recommended)">
+            <option value="auto" selected>Protocol: Auto</option>
+            <option value="6">CAN 11/500</option>
+            <option value="7">CAN 29/500</option>
+            <option value="8">CAN 11/250</option>
+            <option value="9">CAN 29/250</option>
+            <option value="3">ISO 9141-2</option>
+            <option value="4">KWP 5-baud</option>
+            <option value="5">KWP fast</option>
+          </select>
+          <label class="check" title="Reconnect automatically if the adapter drops">
+            <input id="auto-reconnect" type="checkbox" checked />
+            Auto-reconnect
+          </label>
           <button id="btn-connect" class="primary">Connect OBD-II</button>
           <button id="btn-demo" class="ghost">Demo mode</button>
           <button id="btn-disconnect" class="ghost" hidden>Disconnect</button>
@@ -79,6 +93,31 @@
               <button id="btn-live-export" class="ghost" hidden>Export CSV</button>
             </div>
           </div>
+          <details class="custom-pids">
+            <summary>Custom PIDs</summary>
+            <p class="muted">
+              Add manufacturer-specific or extended PIDs using safe formula presets. Saved in this
+              browser profile.
+            </p>
+            <div class="custom-pid-form">
+              <input id="custom-pid" placeholder="PID hex (e.g. 22)" maxlength="4" />
+              <input id="custom-label" placeholder="Label" />
+              <input id="custom-unit" placeholder="Unit (optional)" />
+              <select id="custom-formula">
+                <option value="raw_a">Raw byte</option>
+                <option value="percent_a">Percent (A×100/255)</option>
+                <option value="temp_a">Temperature (A−40)</option>
+                <option value="trim_a">Fuel trim</option>
+                <option value="rpm_ab">RPM (2-byte)</option>
+                <option value="voltage_ab">Voltage (2-byte)</option>
+                <option value="maf_ab">MAF g/s (2-byte)</option>
+                <option value="kpa_ab">kPa (2-byte)</option>
+                <option value="signed_ab_div4">Signed ÷4 (2-byte)</option>
+              </select>
+              <button id="btn-custom-add" class="ghost" type="button">Add</button>
+            </div>
+            <ul id="custom-pid-list" class="custom-pid-list"></ul>
+          </details>
           <div id="live-heroes" class="heroes"></div>
           <div id="live-cards" class="cards"></div>
           <div id="live-flags" class="flags"></div>
@@ -169,6 +208,7 @@
             <h2>Scan History</h2>
             <div>
               <button id="btn-history-refresh" class="ghost">Refresh</button>
+              <button id="btn-history-export" class="ghost">Export JSON</button>
               <button id="btn-history-clear" class="ghost">Clear</button>
             </div>
           </div>
@@ -216,6 +256,7 @@
       <footer class="footer">
         <details id="log-wrap">
           <summary>Adapter log</summary>
+          <button id="btn-log-export" class="ghost" type="button">Save log</button>
           <pre id="adapter-log" class="adapter-log">
 Connect a real adapter to see the ELM327 command/response traffic here.</pre
           >
